@@ -6,7 +6,7 @@ curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/sta
 chmod +x start.sh && \
 bash start.sh
 ```
-
+Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0 
 # MTProto Proxy Whitelist Installer
 
 This script automates the installation and management of an MTProto Telegram Proxy whitelist system protected by NGINX and PHP. It sets up a secure and fast reverse proxy environment to avoid detection by firewalls like the Great Firewall (GFW).
