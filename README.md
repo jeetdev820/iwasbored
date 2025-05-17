@@ -19,10 +19,12 @@ This script automates the installation and management of an MTProto Telegram Pro
 - Installs **PHP-FPM** to run PHP scripts for whitelist management
 - Uses **Certbot** to obtain free SSL certificates and enable HTTPS
 - Implements an IP whitelist for the MTProto proxy via NGINX stream config
+- Automatically configures permissions for all relevant files
 - Provides a **password-protected web interface** to:
   - Add IPs to the whitelist using **one-time or 5-minute tokens**
   - Prevent unauthorized access to the whitelist management
-- Automatically configures permissions for all relevant files
+- Fail2ban and UFW
+  - The script installs fail2ban and configures UFW, which further protects against brute-force and automated attacks that GFW might use.
 - Includes an uninstall option to cleanly remove everything
 
 ---
