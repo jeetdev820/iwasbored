@@ -4,7 +4,7 @@
 ```bash
 curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \
 chmod +x start.sh && \
-apt update\
+sudo apt update\
 apt install dos2unix\
 dos2unix start.sh\
 bash start.sh
