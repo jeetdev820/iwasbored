@@ -1,7 +1,8 @@
 # iwasbored
 with some extra
 chmod +x /root/start.sh 
-sudo bash /root/start.sh    || any other path script is saved
+sudo bash /root/start.sh    || 
+any other path script is saved
 # MTProto Proxy Whitelist Installer
 
 This script automates the installation and management of an MTProto Telegram Proxy whitelist system protected by NGINX and PHP. It sets up a secure and fast reverse proxy environment to avoid detection by firewalls like the Great Firewall (GFW).
