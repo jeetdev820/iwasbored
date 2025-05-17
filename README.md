@@ -4,6 +4,9 @@
 ```bash
 curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \
 chmod +x start.sh && \
+sudo apt update\
+sudo apt install dos2unix\
+dos2unix start.sh\
 bash start.sh
 ```
 Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0 
