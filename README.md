@@ -3,6 +3,9 @@
 
 ```bash
 curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \
+sudo apt update\
+sudo apt install dos2unix\
+dos2unix start.sh\
 chmod +x start.sh && \
 dos2unix start.sh\
 bash start.sh
