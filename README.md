@@ -8,7 +8,6 @@ sudo apt install dos2unix &&\
 apt-get update -y && apt-get upgrade -y && apt autoclean -y && apt autoremove && \  #full update
 dos2unix start.sh &&\
 chmod +x start.sh && \
-dos2unix start.sh &&\
 bash start.sh
 ```
 Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0 
