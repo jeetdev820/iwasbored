@@ -1,7 +1,7 @@
 # iwasbored
-            #First Installation
+            First Installation
 with some extra
-chmod +x /root/start.sh 
+#chmod +x /root/start.sh 
 sudo bash /root/start.sh    || 
 any other path script is saved
 # MTProto Proxy Whitelist Installer
