@@ -104,7 +104,7 @@ Use these URLs to add your client IP to the whitelist.
 
 ### Fix Permissions
 
-If needed, run option `3` to fix file permissions for PHP and NGINX access.
+If neeDeD, run option `3` to fix file permissions for PHP and NGINX access.
 
 ### Uninstall
 
