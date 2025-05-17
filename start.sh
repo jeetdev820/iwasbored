@@ -165,58 +165,30 @@ EOF
 }
 
 setup_nginx_site() {
-  echo -e "\n[+] Configuring Nginx site..."
+  read -p "Enter your domain (must already point to this server): " DOMAIN
+  read -p "Enter your Telegram proxy port (e.g. 48500): " PROXY_PORT
+  read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
 
-  # Replace with your actual variable names
-  DOMAIN=$domain  # assuming you have this set earlier in the script
-  PHP_VERSION="8.1"  # or detect it automatically
-  NGINX_SITE_PATH="/etc/nginx/sites-available/$DOMAIN"
-
-  cat > "$NGINX_SITE_PATH" <<EOF
+  cat > "$WHITELIST_SITE_CONF" <<EOF
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name $DOMAIN;
+  listen 80;
+  server_name $DOMAIN;
 
-    root /var/www/html;
-    index index.php index.html index.htm;
+  root $WEB_DIR;
+  index index.php index.html;
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+  location ~ \.php\$ {
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:/run/php/php-fpm.sock;
+  }
 
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-}
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN;
-    return 301 https://\$host\$request_uri;
+  location / {
+    try_files \$uri \$uri/ =404;
+  }
 }
 EOF
 
-  # Enable site and test config
-
-
-
   ln -sf "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK"
-   nginx -t && systemctl reload nginx
-   echo "[✓] Nginx site configured for $DOMAIN"
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN || true
 
   cat > /etc/nginx/stream.d/mtproto.conf <<EOF
