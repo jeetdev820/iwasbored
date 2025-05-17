@@ -1,5 +1,12 @@
 # FIRST Installation
-<pre> ```bash curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \ chmod +x start.sh && \ bash start.sh ``` </pre>
+## 🚀 Quick Install
+
+```bash
+curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \
+chmod +x start.sh && \
+bash start.sh
+```
+
 # MTProto Proxy Whitelist Installer
 
 This script automates the installation and management of an MTProto Telegram Proxy whitelist system protected by NGINX and PHP. It sets up a secure and fast reverse proxy environment to avoid detection by firewalls like the Great Firewall (GFW).
