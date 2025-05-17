@@ -30,7 +30,7 @@ check_root() {
 install_nginx_with_stream() {
   echo "[+] Installing NGINX with stream module..."
   apt update
-  sudo apt install dos2unix
+  apt install dos2unix
   apt install -y ufw fail2ban nginx libnginx-mod-stream
   if ! grep -q "stream {" "$NGINX_STREAM_CONF"; then
     sed -i '/http {/i stream { include /etc/nginx/stream.d/*.conf; }' "$NGINX_STREAM_CONF"
