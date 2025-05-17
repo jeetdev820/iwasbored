@@ -168,7 +168,7 @@ setup_nginx_site() {
   read -p "Enter your domain (must already point to this server): " DOMAIN
   read -p "Enter your Telegram proxy port (e.g. 48500): " PROXY_PORT
   read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
-PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+
   if [[ -z "$DOMAIN" ]]; then
         echo "[✗] Domain cannot be empty."
         exit 1
@@ -203,7 +203,7 @@ server {
 
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php\$PHP_VERSION-fpm.sock;
+        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
     }
 
     location ~ /\.ht {
