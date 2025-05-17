@@ -168,23 +168,56 @@ setup_nginx_site() {
   read -p "Enter your domain (must already point to this server): " DOMAIN
   read -p "Enter your Telegram proxy port (e.g. 48500): " PROXY_PORT
   read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
+PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+  if [[ -z "$domain" ]]; then
+        echo "[✗] Domain cannot be empty."
+        exit 1
+    fi
 
-  cat > "$WHITELIST_SITE_CONF" <<EOF
+    # Detect PHP version like 8.1 or 8.2 etc.
+    if command -v php >/dev/null 2>&1; then
+        PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+    else
+        echo "[✗] PHP is not installed or not in PATH."
+        exit 1
+    fi
+ cat > "$WHITELIST_SITE_CONF" <<EOF
 server {
-  listen 80;
-  server_name $DOMAIN;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DOMAIN;
 
-  root $WEB_DIR;
-  index index.php index.html;
+    root $WEB_DIR;
+    index index.php index.html index.htm;
 
-  location ~ \.php\$ {
-    include snippets/fastcgi-php.conf;
-    fastcgi_pass unix:/run/php/php-fpm.sock;
-  }
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-  location / {
-    try_files \$uri \$uri/ =404;
-  }
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php\$PHP_VERSION-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+EOF
 }
 EOF
 
