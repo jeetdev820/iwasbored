@@ -169,7 +169,7 @@ setup_nginx_site() {
   read -p "Enter your Telegram proxy port (e.g. 48500): " PROXY_PORT
   read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
 PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
-  if [[ -z "$domain" ]]; then
+  if [[ -z "$DOMAIN" ]]; then
         echo "[✗] Domain cannot be empty."
         exit 1
     fi
