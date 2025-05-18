@@ -214,7 +214,46 @@ EOF
 
   ln -sf "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK"
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN || true
+  systemctl reload nginx
+# 3. Overwrite or update the HTTPS server block as you want
+cat > "$WHITELIST_SITE_CONF" <<EOF
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DOMAIN;
 
+    root $WEB_DIR;
+    index index.php index.html index.htm;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+EOF
+systemctl reload nginx
   cat > /etc/nginx/stream.d/mtproto.conf <<EOF
 
 server {
