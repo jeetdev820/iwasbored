@@ -127,7 +127,9 @@ $whitelist_file = "/etc/nginx/whitelist.txt";
 
 list($stored_hash, $salt) = explode(":", trim(file_get_contents($password_file)));
 
-$pass = $_GET['pass'] ?? '';
+
+$pass = base64_decode(strtr($_GET['pass'], '_-', '/+'));
+
 $token = $_GET['token'] ?? '';
 
 if (!is_password_correct($pass, $salt, $stored_hash)) {
@@ -299,11 +301,14 @@ generate_token_url() {
   echo
   echo "Your access URLs:"
   echo "1) One-time token URL (valid for single use within 5 minutes):"
-  echo "https://$DOMAIN/post.php?pass=$PASS_INPUT&token=$TOKEN_OT"
+ PASS_B64=$(echo -n "$PASS_INPUT" | base64 | tr -d '=' | tr '/+' '_-')
+  echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_OT"
+
   echo
   echo "2) 5-minute token URL (valid for 5 minutes, reusable):"
-  echo "https://$DOMAIN/post.php?pass=$PASS_INPUT&token=$TOKEN_5MIN"
-  echo
+  PASS_B64=$(echo -n "$PASS_INPUT" | base64 | tr -d '=' | tr '/+' '_-')
+  echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_5MIN"
+
   echo "NOTE: Use one-time token once only, 5-minute token multiple times within 5 mins."
 }
 
