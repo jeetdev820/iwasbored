@@ -409,6 +409,7 @@ check_files_and_permissions() {
 }
 
 show_menu() {
+check_root
   clear
   echo "==== MTProto Proxy Whitelist Installer ===="
   echo "1) Install everything (NGINX, PHP, whitelist system)"
