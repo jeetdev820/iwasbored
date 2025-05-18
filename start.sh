@@ -285,6 +285,8 @@ fix_permissions() {
   chmod 755 /etc/nginx
   chmod 755 /var/www
   chmod 755 "$WEB_DIR"
+sudo -u www-data test -r "$PASSWORD_FILE" && echo "[✓] www-data can read password file"
+sudo -u www-data test -w "$WHITE_LIST_FILE" && echo "[✓] www-data can write to whitelist"
 
   echo "[+] Permissions fixed successfully."
 }
@@ -342,6 +344,71 @@ generate_token_url() {
 
   echo "NOTE: Use one-time token once only, 5-minute token multiple times within 5 mins."
 }
+check_files_and_permissions() {
+  echo "[*] Verifying file creation and permissions..."
+
+  local success=true
+
+  # List of expected files
+  declare -A files=(
+    ["$WEB_DIR/add.php"]="644"
+    ["$WEB_DIR/view.php"]="644"
+    ["$WEB_DIR/delete.php"]="644"
+    ["$PASSWORD_FILE"]="600"
+    ["$WHITE_LIST_FILE"]="600"
+    ["$USED_TOKENS_FILE"]="600"
+  )
+
+  for file in "${!files[@]}"; do
+    expected_perm=${files[$file]}
+
+    # Check if file exists
+    if [[ ! -f "$file" ]]; then
+      echo "[✗] Missing file: $file"
+      success=false
+      continue
+    fi
+
+    # Check permissions
+    actual_perm=$(stat -c "%a" "$file")
+    if [[ "$actual_perm" != "$expected_perm" ]]; then
+      echo "[✗] Incorrect permissions on $file (Expected: $expected_perm, Got: $actual_perm)"
+      success=false
+    else
+      echo "[✓] Permissions OK on $file ($expected_perm)"
+    fi
+
+    # Check ownership
+    owner=$(stat -c "%U" "$file")
+    group=$(stat -c "%G" "$file")
+    if [[ "$owner" != "www-data" || "$group" != "www-data" ]]; then
+      echo "[✗] Incorrect ownership on $file (Expected: www-data:www-data, Got: $owner:$group)"
+      success=false
+    else
+      echo "[✓] Ownership OK on $file (www-data:www-data)"
+    fi
+  done
+
+  # Check directory
+  if [[ ! -d "$WEB_DIR" ]]; then
+    echo "[✗] Missing web directory: $WEB_DIR"
+    success=false
+  else
+    dir_perm=$(stat -c "%a" "$WEB_DIR")
+    if [[ "$dir_perm" != "755" ]]; then
+      echo "[✗] Incorrect permissions on $WEB_DIR (Expected: 755, Got: $dir_perm)"
+      success=false
+    else
+      echo "[✓] Web directory permissions OK ($dir_perm)"
+    fi
+  fi
+
+  if [[ "$success" = true ]]; then
+    echo "[+] All files verified successfully."
+  else
+    echo "[!] Some files are missing or have incorrect permissions."
+  fi
+}
 
 show_menu() {
   clear
@@ -355,14 +422,17 @@ show_menu() {
   read -p "Choose an option: " choice
   case $choice in
     1)
-      check_root
-      install_nginx_with_stream
-      install_php
-      install_certbot
-      create_files_and_permissions
-      setup_nginx_site
-      fix_permissions
-      echo "Installation complete."
+  check_root
+  install_nginx_with_stream
+  install_php
+  install_certbot
+  create_files_and_permissions
+  fix_permissions
+  setup_nginx_site
+  check_files_and_permissions
+# Final success message
+echo "[*] Installation complete."
+
       ;;
     2)
       generate_token_url
