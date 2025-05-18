@@ -228,8 +228,7 @@ server {
     return 301 https://\$host\$request_uri;
 }
 EOF
-}
-EOF
+
 
   ln -sf "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK"
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN || true
