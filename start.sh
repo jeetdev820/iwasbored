@@ -351,9 +351,7 @@ check_files_and_permissions() {
 
   # List of expected files
   declare -A files=(
-    ["$WEB_DIR/add.php"]="644"
-    ["$WEB_DIR/view.php"]="644"
-    ["$WEB_DIR/delete.php"]="644"
+    ["$WEB_DIR/post.php"]="644"
     ["$PASSWORD_FILE"]="600"
     ["$WHITE_LIST_FILE"]="600"
     ["$USED_TOKENS_FILE"]="600"
