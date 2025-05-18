@@ -31,9 +31,11 @@ install_nginx_with_stream() {
   echo "[+] Installing NGINX with stream module..."
   apt update
   apt install -y ufw fail2ban nginx libnginx-mod-stream
-  if ! grep -q "stream {" "$NGINX_STREAM_CONF"; then
-    sed -i '/http {/i stream { include /etc/nginx/stream.d/*.conf; }' "$NGINX_STREAM_CONF"
-  fi
+if ! grep -q "stream {" "$NGINX_STREAM_CONF"; then
+  sed -i "/http {/i \\
+stream {\n    include /etc/nginx/stream.d/mtproto.conf;\n\n}" "$NGINX_STREAM_CONF"
+fi
+
   mkdir -p /etc/nginx/stream.d
 }
 
