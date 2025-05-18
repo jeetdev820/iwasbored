@@ -253,7 +253,7 @@ server {
     return 301 https://\$host\$request_uri;
 }
 EOF
-chmod 600 /etc/nginx
+chmod 755 /etc/nginx
 systemctl reload nginx
   cat > /etc/nginx/stream.d/mtproto.conf <<EOF
 
