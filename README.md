@@ -39,7 +39,7 @@ tweak.
 ### 1. NGINX Stream Proxy
 
 - MTProto proxy listens on a configured port (e.g., `4433`)
-- NGINX listens on another port (e.g., `443`) and acts as a TCP reverse proxy to the MTProto proxy
+- NGINX listens on another port (e.g., `8443/443`) and acts as a TCP reverse proxy to the MTProto proxy
 - Only IPs in the whitelist are allowed through NGINX to the MTProto proxy (using `allow IP;` directives)
 
 ### 2. Whitelist File
