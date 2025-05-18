@@ -128,9 +128,17 @@ $whitelist_file = "/etc/nginx/whitelist.txt";
 list($stored_hash, $salt) = explode(":", trim(file_get_contents($password_file)));
 
 
+if (!isset($_GET['pass']) || empty($_GET['pass'])) {
+    http_response_code(400);
+    exit("Missing required parameter: pass");
+}
 $pass = base64_decode(strtr($_GET['pass'], '_-', '/+'));
 
-$token = $_GET['token'] ?? '';
+$token = isset($_GET['token']) ? $_GET['token'] : '';
+if (empty($token)) {
+    http_response_code(400);
+    exit("Missing required parameter: token");
+}
 
 if (!is_password_correct($pass, $salt, $stored_hash)) {
     http_response_code(403);
