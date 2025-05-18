@@ -191,41 +191,23 @@ setup_nginx_site() {
         echo "[✗] PHP is not installed or not in PATH."
         exit 1
     fi
- cat > "$WHITELIST_SITE_CONF" <<EOF
+
+  cat > "$WHITELIST_SITE_CONF" <<EOF
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name $DOMAIN;
+  listen 80;
+  server_name $DOMAIN;
 
-    root $WEB_DIR;
-    index index.php index.html index.htm;
+  root $WEB_DIR;
+  index index.php index.html;
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+  location ~ \.php\$ {
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:/run/php/php-fpm.sock;
+  }
 
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-}
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN;
-    return 301 https://\$host\$request_uri;
+  location / {
+    try_files \$uri \$uri/ =404;
+  }
 }
 EOF
 
