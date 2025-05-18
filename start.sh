@@ -421,13 +421,13 @@ show_menu() {
   case $choice in
     1)
   check_root
-  install_nginx_with_stream
-  install_php
-  install_certbot
-  create_files_and_permissions
-  fix_permissions
-  setup_nginx_site
-  check_files_and_permissions
+      install_nginx_with_stream
+      install_php
+      install_certbot
+      create_files_and_permissions
+      setup_nginx_site
+      fix_permissions
+      check_files_and_permissions
 # Final success message
 echo "[*] Installation complete."
 
