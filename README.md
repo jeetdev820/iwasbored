@@ -2,7 +2,7 @@
 ## 🚀 Quick Install
 
 ```bash
-curl -O https://raw.githubusercontent.com/jeet8200/iwasbored/refs/heads/main/start.sh && \
+curl -O https://raw.githubusercontent.com/jeetdev820/iwasbored/refs/heads/main/start.sh && \
 sudo apt update &&\
 sudo apt install dos2unix &&\
 apt-get update -y && apt-get upgrade -y && apt autoclean -y && apt autoremove && \  #full update
