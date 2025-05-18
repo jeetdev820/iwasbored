@@ -56,7 +56,7 @@ tweak.
 ### 3. Whitelist Management Web Interface (`post.php`)
 
 - Hosted on HTTPS on a configured port (default port 8443)
-- Requires a **password** provided as a GET parameter `pass` (e.g., `?pass=YourPassword`)
+- Requires a **password** provided as a GET parameter `pass` (e.g., `?pass=YourPassword|base64`)
 - To add an IP, you send a GET request with one of these parameters:
   - `one_time_token` — a unique token usable only once
   - `five_min_token` — a token valid for 5 minutes, reusable multiple times
