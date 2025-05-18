@@ -56,7 +56,7 @@ tweak.
 ### 3. Whitelist Management Web Interface (`post.php`)
 
 - Hosted on HTTPS on a configured port (default port 8443)
-- Requires a **password** provided as a GET parameter `pass` (e.g., `?pass=YourPassword|base64`)
+- Requires a **password** provided as a GET parameter `pass` (e.g., `?pass=YourPassword`)
 - To add an IP, you send a GET request with one of these parameters:
   - `one_time_token` — a unique token usable only once
   - `five_min_token` — a token valid for 5 minutes, reusable multiple times
@@ -100,8 +100,8 @@ Choose option `2` in the script menu. It will print:
 Example:
 
 ```
-https://yourdomain:8443/post.php?pass=YourPassword&one_time_token=BASE64TOKEN
-https://yourdomain:8443/post.php?pass=YourPassword&five_min_token=BASE64TOKEN
+https://yourdomain:8443/post.php?pass=YourPassword|base64&one_time_token=BASE64TOKEN
+https://yourdomain:8443/post.php?pass=YourPassword|base64&five_min_token=BASE64TOKEN
 ```
 
 Use these URLs to add your client IP to the whitelist.
