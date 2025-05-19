@@ -35,6 +35,26 @@ setup_ufw_rules() {
     ufw allow 8443/tcp
     ufw --force enable
 }
+install_mtproto_proxy() {
+  echo "[+] Downloading and installing MTProto Proxy using external script..."
+  
+  # Move to a safe working directory
+  cd /opt || exit 1
+
+  # Download and execute the MTProto Proxy installer script
+  curl -o MTProtoProxyInstall.sh -L https://git.io/fjo34
+
+  if [ -f MTProtoProxyInstall.sh ]; then
+    chmod +x MTProtoProxyInstall.sh
+    bash MTProtoProxyInstall.sh
+  else
+    echo "[✗] Failed to download MTProtoProxyInstall.sh"
+    return 1
+  fi
+
+  echo "[✓] MTProto Proxy installation completed."
+}
+
 create_password() {
   echo "=== Create/Change Password ==="
   read -p "Enter new password for IP whitelist page: " -s PASSWORD
@@ -458,6 +478,7 @@ check_root
   echo "3) Fix permissions"
   echo "4) Change WhiteList Password/hashed/salt"
   echo "5) Uninstall (remove all installed components)"
+  echo "6) install mtproto-proxy"
   echo "0) Exit"
   echo "==========================================="
   read -p "Choose an option: " choice
@@ -496,6 +517,10 @@ echo "[*] Installation complete."
       systemctl restart nginx
       echo "Uninstall complete."
       ;;
+    6)
+      install_mtproto_proxy
+      ;;
+
     0)
       echo "Bye."
       exit 0
