@@ -456,7 +456,7 @@ check_root
   echo "1) Install everything (NGINX, PHP, whitelist system)"
   echo "2) Generate access URL with tokens (one-time & 5-min tokens)"
   echo "3) Fix permissions"
-  echo "4) Change WhiteList Password/hashed/salt
+  echo "4) Change WhiteList Password/hashed/salt"
   echo "5) Uninstall (remove all installed components)"
   echo "0) Exit"
   echo "==========================================="
