@@ -100,8 +100,8 @@ Choose option `2` in the script menu. It will print:
 Example:
 
 ```
-https://yourdomain:8443/post.php?pass=YourPassword&one_time_token=BASE64TOKEN
-https://yourdomain:8443/post.php?pass=YourPassword&five_min_token=BASE64TOKEN
+https://yourdomain:8443/post.php?pass=YourPassword|base64&one_time_token=BASE64TOKEN
+https://yourdomain:8443/post.php?pass=YourPassword|base64&five_min_token=BASE64TOKEN
 ```
 
 Use these URLs to add your client IP to the whitelist.
