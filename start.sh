@@ -14,6 +14,7 @@ NGINX_STREAM_CONF="/etc/nginx/nginx.conf"
 NGINX_SITES_DIR="/etc/nginx/sites-available"
 NGINX_SITES_LINK="/etc/nginx/sites-enabled/whitelist_gateway"
 WHITELIST_SITE_CONF="$NGINX_SITES_DIR/whitelist_gateway"
+STREAM_CONF_FILE="/etc/nginx/stream.d/mtproto.conf"
 
 DOMAIN=""
 PROXY_PORT=""
@@ -31,9 +32,12 @@ install_nginx_with_stream() {
   echo "[+] Installing NGINX with stream module..."
   apt update
   apt install -y ufw fail2ban nginx libnginx-mod-stream
+  mkdir -p /etc/nginx/stream.d
+touch /etc/nginx/stream.d/mtproto.conf
+
 if ! grep -q "stream {" "$NGINX_STREAM_CONF"; then
   sed -i "/http {/i \\
-stream {\n    include /etc/nginx/stream.d/*.conf;\n\n}" "$NGINX_STREAM_CONF"
+stream {\n    include /etc/nginx/stream.d/mtproto.conf;\n\n}" "$NGINX_STREAM_CONF"
 fi
 
   mkdir -p /etc/nginx/stream.d
@@ -182,7 +186,7 @@ setup_nginx_site() {
   read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
 
   if [[ -z "$DOMAIN" ]]; then
-        echo "[✗] Domain cannot be empty."
+        echo "[âœ—] Domain cannot be empty."
         exit 1
     fi
 
@@ -190,7 +194,7 @@ setup_nginx_site() {
     if command -v php >/dev/null 2>&1; then
         PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
     else
-        echo "[✗] PHP is not installed or not in PATH."
+        echo "[âœ—] PHP is not installed or not in PATH."
         exit 1
     fi
 
@@ -285,8 +289,20 @@ fix_permissions() {
   chmod 755 /etc/nginx
   chmod 755 /var/www
   chmod 755 "$WEB_DIR"
-sudo -u www-data test -r "$PASSWORD_FILE" && echo "[✓] www-data can read password file"
-sudo -u www-data test -w "$WHITE_LIST_FILE" && echo "[✓] www-data can write to whitelist"
+  sudo -u www-data test -r "$PASSWORD_FILE" && echo "[âœ“] www-data can read password file"
+  sudo -u www-data test -w "$WHITE_LIST_FILE" && echo "[âœ“] www-data can write to whitelist"
+  # Path to the config file
+  STREAM_CONF_FILE="/etc/nginx/stream.d/mtproto.conf"
+
+  # Ensure the directory exists
+  mkdir -p /etc/nginx/stream.d
+
+  # Create the file if it doesn't exist
+  touch "$STREAM_CONF_FILE"
+
+  # Set secure permissions
+  chown root:root "$STREAM_CONF_FILE"
+  chmod 644 "$STREAM_CONF_FILE"
 
   echo "[+] Permissions fixed successfully."
 }
@@ -362,7 +378,7 @@ check_files_and_permissions() {
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-      echo "[✗] Missing file: $file"
+      echo "[âœ—] Missing file: $file"
       success=false
       continue
     fi
@@ -370,34 +386,34 @@ check_files_and_permissions() {
     # Check permissions
     actual_perm=$(stat -c "%a" "$file")
     if [[ "$actual_perm" != "$expected_perm" ]]; then
-      echo "[✗] Incorrect permissions on $file (Expected: $expected_perm, Got: $actual_perm)"
+      echo "[âœ—] Incorrect permissions on $file (Expected: $expected_perm, Got: $actual_perm)"
       success=false
     else
-      echo "[✓] Permissions OK on $file ($expected_perm)"
+      echo "[âœ“] Permissions OK on $file ($expected_perm)"
     fi
 
     # Check ownership
     owner=$(stat -c "%U" "$file")
     group=$(stat -c "%G" "$file")
     if [[ "$owner" != "www-data" || "$group" != "www-data" ]]; then
-      echo "[✗] Incorrect ownership on $file (Expected: www-data:www-data, Got: $owner:$group)"
+      echo "[âœ—] Incorrect ownership on $file (Expected: www-data:www-data, Got: $owner:$group)"
       success=false
     else
-      echo "[✓] Ownership OK on $file (www-data:www-data)"
+      echo "[âœ“] Ownership OK on $file (www-data:www-data)"
     fi
   done
 
   # Check directory
   if [[ ! -d "$WEB_DIR" ]]; then
-    echo "[✗] Missing web directory: $WEB_DIR"
+    echo "[âœ—] Missing web directory: $WEB_DIR"
     success=false
   else
     dir_perm=$(stat -c "%a" "$WEB_DIR")
     if [[ "$dir_perm" != "755" ]]; then
-      echo "[✗] Incorrect permissions on $WEB_DIR (Expected: 755, Got: $dir_perm)"
+      echo "[âœ—] Incorrect permissions on $WEB_DIR (Expected: 755, Got: $dir_perm)"
       success=false
     else
-      echo "[✓] Web directory permissions OK ($dir_perm)"
+      echo "[âœ“] Web directory permissions OK ($dir_perm)"
     fi
   fi
 
