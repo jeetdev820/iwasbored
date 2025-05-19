@@ -27,7 +27,14 @@ check_root() {
     exit 1
   fi
 }
-
+setup_ufw_rules() {
+   
+    ufw limit ssh
+    ufw allow http/tcp
+    ufw allow https/tcp
+    ufw allow 8443/tcp
+    ufw --force enable
+}
 install_nginx_with_stream() {
   echo "[+] Installing NGINX with stream module..."
   apt update
@@ -445,6 +452,7 @@ check_root
       setup_nginx_site
       fix_permissions
       check_files_and_permissions
+      setup_ufw_rules
 # Final success message
 echo "[*] Installation complete."
 
