@@ -48,11 +48,11 @@ install_mtproto_proxy() {
     chmod +x MTProtoProxyInstall.sh
     bash MTProtoProxyInstall.sh
   else
-    echo "[✗] Failed to download MTProtoProxyInstall.sh"
+    echo "[âœ—] Failed to download MTProtoProxyInstall.sh"
     return 1
   fi
 
-  echo "[✓] MTProto Proxy installation completed."
+  echo "[âœ“] MTProto Proxy installation completed."
 }
 
 create_password() {
@@ -231,7 +231,7 @@ setup_nginx_site() {
   read -p "Enter NGINX whitelist gateway port (e.g. 8443): " NGINX_PORT
 
   if [[ -z "$DOMAIN" ]]; then
-        echo "[âœ—] Domain cannot be empty."
+        echo "[[X]] Domain cannot be empty."
         exit 1
     fi
 
@@ -239,7 +239,7 @@ setup_nginx_site() {
     if command -v php >/dev/null 2>&1; then
         PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
     else
-        echo "[âœ—] PHP is not installed or not in PATH."
+        echo "[[X]] PHP is not installed or not in PATH."
         exit 1
     fi
 
@@ -334,8 +334,8 @@ fix_permissions() {
   chmod 755 /etc/nginx
   chmod 755 /var/www
   chmod 755 "$WEB_DIR"
-  sudo -u www-data test -r "$PASSWORD_FILE" && echo "[âœ“] www-data can read password file"
-  sudo -u www-data test -w "$WHITE_LIST_FILE" && echo "[âœ“] www-data can write to whitelist"
+  sudo -u www-data test -r "$PASSWORD_FILE" && echo "[[OK]] www-data can read password file"
+  sudo -u www-data test -w "$WHITE_LIST_FILE" && echo "[[OK]] www-data can write to whitelist"
   # Path to the config file
   STREAM_CONF_FILE="/etc/nginx/stream.d/mtproto.conf"
 
@@ -423,7 +423,7 @@ check_files_and_permissions() {
 
     # Check if file exists
     if [[ ! -f "$file" ]]; then
-      echo "[âœ—] Missing file: $file"
+      echo "[[X]] Missing file: $file"
       success=false
       continue
     fi
@@ -431,34 +431,34 @@ check_files_and_permissions() {
     # Check permissions
     actual_perm=$(stat -c "%a" "$file")
     if [[ "$actual_perm" != "$expected_perm" ]]; then
-      echo "[âœ—] Incorrect permissions on $file (Expected: $expected_perm, Got: $actual_perm)"
+      echo "[[X]] Incorrect permissions on $file (Expected: $expected_perm, Got: $actual_perm)"
       success=false
     else
-      echo "[âœ“] Permissions OK on $file ($expected_perm)"
+      echo "[[OK]] Permissions OK on $file ($expected_perm)"
     fi
 
     # Check ownership
     owner=$(stat -c "%U" "$file")
     group=$(stat -c "%G" "$file")
     if [[ "$owner" != "www-data" || "$group" != "www-data" ]]; then
-      echo "[âœ—] Incorrect ownership on $file (Expected: www-data:www-data, Got: $owner:$group)"
+      echo "[[X]] Incorrect ownership on $file (Expected: www-data:www-data, Got: $owner:$group)"
       success=false
     else
-      echo "[âœ“] Ownership OK on $file (www-data:www-data)"
+      echo "[[OK]] Ownership OK on $file (www-data:www-data)"
     fi
   done
 
   # Check directory
   if [[ ! -d "$WEB_DIR" ]]; then
-    echo "[âœ—] Missing web directory: $WEB_DIR"
+    echo "[[X]] Missing web directory: $WEB_DIR"
     success=false
   else
     dir_perm=$(stat -c "%a" "$WEB_DIR")
     if [[ "$dir_perm" != "755" ]]; then
-      echo "[âœ—] Incorrect permissions on $WEB_DIR (Expected: 755, Got: $dir_perm)"
+      echo "[[X]] Incorrect permissions on $WEB_DIR (Expected: 755, Got: $dir_perm)"
       success=false
     else
-      echo "[âœ“] Web directory permissions OK ($dir_perm)"
+      echo "[[OK]] Web directory permissions OK ($dir_perm)"
     fi
   fi
 
