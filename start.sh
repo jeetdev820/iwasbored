@@ -472,18 +472,23 @@ check_files_and_permissions() {
 show_menu() {
 check_root
   clear
+  while true; do
   echo "==== MTProto Proxy Whitelist Installer ===="
-  echo "1) Install everything (NGINX, PHP, whitelist system)"
-  echo "2) Generate access URL with tokens (one-time & 5-min tokens)"
-  echo "3) Fix permissions"
-  echo "4) Change WhiteList Password/hashed/salt"
-  echo "5) Uninstall (remove all installed components)"
-  echo "6) install mtproto-proxy"
+  echo "1) install mtproto-proxy"
+  echo "2) Install everything (NGINX, PHP, whitelist system)"
+  echo "3) Generate access URL with tokens (one-time & 5-min tokens)"
+  echo "4) Fix permissions"
+  echo "5) Change WhiteList Password/hashed/salt"
+  echo "6) Uninstall (remove all installed components)"
   echo "0) Exit"
   echo "==========================================="
   read -p "Choose an option: " choice
   case $choice in
     1)
+      install_mtproto_proxy
+      ;;
+
+    2)
   check_root
       install_nginx_with_stream
       install_php
@@ -497,17 +502,17 @@ check_root
 echo "[*] Installation complete."
 
       ;;
-    2)
+    3)
       generate_token_url
       ;;
-    3)
+    4)
       fix_permissions
       ;;
-    4)
+    5)
       create_password
       ;;
 
-    5)
+    6)
       echo "Uninstalling..."
       systemctl stop nginx
       apt remove -y nginx php-fpm php libnginx-mod-stream certbot python3-certbot-nginx
@@ -516,9 +521,6 @@ echo "[*] Installation complete."
       rm -f /etc/nginx/stream.d/mtproto.conf
       systemctl restart nginx
       echo "Uninstall complete."
-      ;;
-    6)
-      install_mtproto_proxy
       ;;
 
     0)
@@ -530,7 +532,7 @@ echo "[*] Installation complete."
       ;;
   esac
   read -p "Press Enter to continue..."
-  show_menu
+  done
 }
 
 show_menu
