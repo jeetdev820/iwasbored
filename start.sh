@@ -35,6 +35,24 @@ setup_ufw_rules() {
     ufw allow 8443/tcp
     ufw --force enable
 }
+create_password() {
+  echo "=== Create/Change Password ==="
+  read -p "Enter new password for IP whitelist page: " -s PASSWORD
+  echo
+  read -p "Confirm new password: " -s PASSWORD_CONFIRM
+  echo
+  if [ "$PASSWORD" != "$PASSWORD_CONFIRM" ]; then
+    echo "Passwords do not match!"
+    return
+  fi
+  SALT=$(openssl rand -hex 8)
+  HASHED_PASSWORD=$(echo -n "$PASSWORD$SALT" | sha256sum | awk '{print $1}')
+  echo "$HASHED_PASSWORD:$SALT" > "$PASSWORD_FILE"
+  chmod 600 "$PASSWORD_FILE"
+  chown www-data:www-data "$PASSWORD_FILE"
+  echo "Password updated successfully."
+}
+
 install_nginx_with_stream() {
   echo "[+] Installing NGINX with stream module..."
   apt update
@@ -438,7 +456,8 @@ check_root
   echo "1) Install everything (NGINX, PHP, whitelist system)"
   echo "2) Generate access URL with tokens (one-time & 5-min tokens)"
   echo "3) Fix permissions"
-  echo "4) Uninstall (remove all installed components)"
+  echo "4) Change WhiteList Password/hashed/salt
+  echo "5) Uninstall (remove all installed components)"
   echo "0) Exit"
   echo "==========================================="
   read -p "Choose an option: " choice
@@ -464,6 +483,10 @@ echo "[*] Installation complete."
       fix_permissions
       ;;
     4)
+      create_password
+      ;;
+
+    5)
       echo "Uninstalling..."
       systemctl stop nginx
       apt remove -y nginx php-fpm php libnginx-mod-stream certbot python3-certbot-nginx
