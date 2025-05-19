@@ -35,6 +35,26 @@ setup_ufw_rules() {
     ufw allow 8443/tcp
     ufw --force enable
 }
+install_mtproto_proxy() {
+  echo "[+] Downloading and installing MTProto Proxy using external script..."
+  
+  # Move to a safe working directory
+  cd /opt || exit 1
+
+  # Download and execute the MTProto Proxy installer script
+  curl -o MTProtoProxyInstall.sh -L https://git.io/fjo34
+
+  if [ -f MTProtoProxyInstall.sh ]; then
+    chmod +x MTProtoProxyInstall.sh
+    bash MTProtoProxyInstall.sh
+  else
+    echo "[✗] Failed to download MTProtoProxyInstall.sh"
+    return 1
+  fi
+
+  echo "[✓] MTProto Proxy installation completed."
+}
+
 create_password() {
   echo "=== Create/Change Password ==="
   read -p "Enter new password for IP whitelist page: " -s PASSWORD
@@ -452,17 +472,23 @@ check_files_and_permissions() {
 show_menu() {
 check_root
   clear
+  while true; do
   echo "==== MTProto Proxy Whitelist Installer ===="
-  echo "1) Install everything (NGINX, PHP, whitelist system)"
-  echo "2) Generate access URL with tokens (one-time & 5-min tokens)"
-  echo "3) Fix permissions"
-  echo "4) Change WhiteList Password/hashed/salt"
-  echo "5) Uninstall (remove all installed components)"
+  echo "1) install mtproto-proxy"
+  echo "2) Install everything (NGINX, PHP, whitelist system)"
+  echo "3) Generate access URL with tokens (one-time & 5-min tokens)"
+  echo "4) Fix permissions"
+  echo "5) Change WhiteList Password/hashed/salt"
+  echo "6) Uninstall (remove all installed components)"
   echo "0) Exit"
   echo "==========================================="
   read -p "Choose an option: " choice
   case $choice in
     1)
+      install_mtproto_proxy
+      ;;
+
+    2)
   check_root
       install_nginx_with_stream
       install_php
@@ -476,17 +502,17 @@ check_root
 echo "[*] Installation complete."
 
       ;;
-    2)
+    3)
       generate_token_url
       ;;
-    3)
+    4)
       fix_permissions
       ;;
-    4)
+    5)
       create_password
       ;;
 
-    5)
+    6)
       echo "Uninstalling..."
       systemctl stop nginx
       apt remove -y nginx php-fpm php libnginx-mod-stream certbot python3-certbot-nginx
@@ -496,6 +522,7 @@ echo "[*] Installation complete."
       systemctl restart nginx
       echo "Uninstall complete."
       ;;
+
     0)
       echo "Bye."
       exit 0
@@ -505,7 +532,7 @@ echo "[*] Installation complete."
       ;;
   esac
   read -p "Press Enter to continue..."
-  show_menu
+  done
 }
 
 show_menu
