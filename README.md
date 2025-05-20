@@ -10,7 +10,7 @@ dos2unix start.sh &&\
 chmod +x start.sh && \
 bash start.sh
 ```
-Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0 
+Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0  or first install mtproto
 # MTProto Proxy Whitelist Installer
 
 This script automates the installation and management of an MTProto Telegram Proxy whitelist system protected by NGINX and PHP. It sets up a secure and fast reverse proxy environment to avoid detection by firewalls like the Great Firewall (GFW) it should work for other kind of proxy servers with little 
