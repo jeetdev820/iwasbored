@@ -149,14 +149,14 @@ function is_one_time_token_valid($token, $secret, $used_tokens_file) {
     if (count($parts) !== 2) return false;
     list($timestamp, $hash) = $parts;
     if (!ctype_digit($timestamp)) return false;
-    if (time() - intval($timestamp) > 300) return false; // 5 min expiry
+    if (time() - intval($timestamp) > 2592000) return false; // 30 days min expiry
     $check_hash = hash('sha256', $secret . $timestamp);
     if (!hash_equals($check_hash, $hash)) return false;
     return true;
 }
 
 // Validate 5-minute token: token = base64(timestamp:hash)
-// timestamp not older than 5 minutes (300 seconds)
+// timestamp not older than 15 minutes (1500 seconds)
 // and hash = sha256(secret + timestamp)
 function is_five_min_token_valid($token, $secret) {
     $decoded = base64_decode($token, true);
@@ -394,12 +394,12 @@ generate_token_url() {
 
   echo
   echo "Your access URLs:"
-  echo "1) One-time token URL (valid for single use within 5 minutes):"
+  echo "1) One-time token URL (valid for single use within 30 Days):"
  PASS_B64=$(echo -n "$PASS_INPUT" | base64 | tr -d '=' | tr '/+' '_-')
   echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_OT"
 
   echo
-  echo "2) 5-minute token URL (valid for 5 minutes, reusable):"
+  echo "2) 15-minute token URL (valid for 15 minutes, reusable):"
   PASS_B64=$(echo -n "$PASS_INPUT" | base64 | tr -d '=' | tr '/+' '_-')
   echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_5MIN"
 
