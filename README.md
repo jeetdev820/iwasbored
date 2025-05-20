@@ -26,7 +26,7 @@ tweak.
 - Implements an IP whitelist for the MTProto proxy via NGINX stream config
 - Automatically configures permissions for all relevant files
 - Provides a **password-protected web interface** to:
-  - Add IPs to the whitelist using **one-time or 5-minute tokens**
+  - Add IPs to the whitelist using **one-time or 15-minute tokens**
   - Prevent unauthorized access to the whitelist management
 - Fail2ban and UFW
   - The script installs fail2ban and configures UFW, which further protects against brute-force and automated attacks that GFW might use.
