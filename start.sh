@@ -48,11 +48,11 @@ install_mtproto_proxy() {
     chmod +x MTProtoProxyInstall.sh
     bash MTProtoProxyInstall.sh
   else
-    echo "[âœ—] Failed to download MTProtoProxyInstall.sh"
+    echo "[Ã¢Å“â€”] Failed to download MTProtoProxyInstall.sh"
     return 1
   fi
 
-  echo "[âœ“] MTProto Proxy installation completed."
+  echo "[Ã¢Å“â€œ] MTProto Proxy installation completed."
 }
 
 create_password() {
