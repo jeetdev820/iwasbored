@@ -811,7 +811,7 @@ show_menu() {
     echo -e "4) Fix permissions"
     echo -e "5) Change Whitelist Password"
     echo -e "6) Check system status"
-    echo -e "7) Uninstall everything"
+    echo -e "7) Uninstall everything full wipe "
     echo -e "${GREEN}8) Send whitelist link via Telegram${NC}"
     echo -e "0) Exit${NC}"
     echo -e "==========================================="
