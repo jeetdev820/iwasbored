@@ -31,7 +31,7 @@ tweak.
 - Fail2ban and UFW
   - The script installs fail2ban and configures UFW, which further protects against brute-force and automated attacks that GFW might use.
 - Includes an uninstall option to cleanly remove everything
-
+- 
 ---
 
 ## How It Works
@@ -81,8 +81,9 @@ tweak.
 ## Usage
 
 ### Installation
+- 1) install python-mtproto-proxy by Alexander Bersenev  https://github.com/alexbers/mtprotoproxy   
 
-Run the script and choose option  `2` to install everything:
+- 2)Run the script and choose option  `2` to install everything:
 
 - NGINX with stream support
 - PHP-FPM
@@ -91,7 +92,7 @@ Run the script and choose option  `2` to install everything:
 - Permissions are fixed automatically
 
 ### Generate Access URLs and Tokens
-
+3)
 Choose option `3` in the script menu. It will print:
 
 - One-time token URL (use once for 30days)
@@ -108,11 +109,11 @@ Use these URLs to add your client IP to the whitelist.
 
 ### Fix Permissions
 
-If neeDeD, run option `3` to fix file permissions for PHP and NGINX access.
+If neeDeD, run option `4` to fix file permissions for PHP and NGINX access.
 
 ### Uninstall
 
-Choose option `4` to remove all installed components, configuration files, and stop NGINX.
+Choose option `7` to remove all installed components, configuration files, and stop NGINX.
 
 ---
 
