@@ -82,7 +82,7 @@ tweak.
 
 ### Installation
 
-Run the script and choose option `1` to install everything:
+Run the script and choose option  `2` to install everything:
 
 - NGINX with stream support
 - PHP-FPM
@@ -92,10 +92,10 @@ Run the script and choose option `1` to install everything:
 
 ### Generate Access URLs and Tokens
 
-Choose option `2` in the script menu. It will print:
+Choose option `3` in the script menu. It will print:
 
-- One-time token URL (use once)
-- 5-minute token URL (use multiple times within 5 minutes)
+- One-time token URL (use once for 30days)
+- 15-minute token URL (use multiple times within 15 minutes)
 
 Example:
 
