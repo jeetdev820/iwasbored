@@ -607,6 +607,31 @@ generate_token_url() {
 
   echo -e "\n${YELLOW}NOTE:${NC} Use one-time token once only, 15-minute token can be used multiple times within 15 mins."
 }
+#
+send_whitelist_link_telegram() {
+    read -p "Enter your API Bot token: " BOT_TOKEN
+    read -p "Enter user's Telegram chat ID: " CHAT_ID
+
+    # Remove newlines from TOKEN_OT (just in case)
+    TOKEN_OT=$(echo "$TOKEN_OT" | tr -d '\n')
+
+    WHITELIST_LINK="https://${DOMAIN}/post.php?pass=${PASS_B64}&token=${TOKEN_OT}"
+
+    MESSAGE="Your  whitelist link (valid for a limited time):
+${WHITELIST_LINK}"
+
+    response=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        -d chat_id="${CHAT_ID}" \
+        --data-urlencode text="${MESSAGE}" \
+        -d parse_mode="Markdown")
+
+    echo "Telegram API response: $response"
+    if echo "$response" | grep -q '"ok":true'; then
+        echo "Whitelist link sent to Telegram user ${CHAT_ID}."
+    else
+        echo "Failed to send Telegram message."
+    fi
+}
 
 # Check files and permissions
 check_files_and_permissions() {
@@ -787,6 +812,7 @@ show_menu() {
     echo -e "5) Change Whitelist Password"
     echo -e "6) Check system status"
     echo -e "7) Uninstall everything"
+    echo -e "${GREEN}8) Send whitelist link via Telegram${NC}"
     echo -e "0) Exit${NC}"
     echo -e "==========================================="
     
@@ -819,6 +845,13 @@ show_menu() {
         check_root
         uninstall
         ;;
+
+      8)
+        check_root
+        generate_token_url   # This should set $WHITELIST_LINK
+        send_whitelist_link_telegram
+        ;;
+
       0)
         echo -e "${BLUE}Exiting...${NC}"
         exit 0
