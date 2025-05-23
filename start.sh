@@ -202,6 +202,19 @@ install_mtproto_proxy() {
   log "${GREEN}MTProto Proxy installed successfully${NC}"
 }
 
+# Install MTProto Proxy (Method 2 - alternative)
+install_mtproto_proxy_method2() {
+  log "Installing MTProto Proxy (Method 2)..."
+  cd /opt || error_exit "Failed to change to /opt directory"
+  if curl -L -o mtp_install.sh https://git.io/fj5ru; then
+    chmod +x mtp_install.sh || error_exit "Failed to make installer executable"
+    bash mtp_install.sh || error_exit "MTProto Proxy installation failed"
+  else
+    error_exit "Failed to download mtp_install.sh"
+  fi
+  log "${GREEN}MTProto Proxy installed successfully (Method 2)${NC}"
+}
+
 # Install NGINX with stream module
 install_nginx_with_stream() {
   log "Installing NGINX with stream module..."
@@ -855,7 +868,19 @@ show_menu() {
     case $choice in
       1)
         check_root
-        install_mtproto_proxy
+        echo -e "${GREEN}Choose MTProto Proxy installation method:${NC}"
+        echo "1) Method 1 Python Proxy by alexbers (git.io/fjo34 - Original)"
+        echo "2) Method 2 @seriyps creator of the Erlang Proxy (git.io/fj5ru - Alternative)"
+        read -p "Enter 1 or 2: " mtp_choice
+        case "$mtp_choice" in
+        1) install_mtproto_proxy
+;;
+        2) install_mtproto_proxy_method2 
+;;
+        *) echo -e "${RED}Invalid choice.${NC}" 
+;;
+        esac
+        
         ;;
       2)
         install_all
