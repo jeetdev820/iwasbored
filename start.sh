@@ -796,6 +796,40 @@ install_all() {
   log "${GREEN}Installation completed successfully!${NC}"
   show_status
 }
+#Random HTML
+random_template_site() {
+    # Check for dependencies
+    for cmd in wget unzip shuf; do
+        command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd not found!"; exit 1; }
+    done
+
+    # Download and extract randomfakehtml if not present
+    cd "$HOME" || exit 1
+
+    if [[ ! -d "randomfakehtml-master" ]]; then
+        wget -q https://github.com/GFW4Fun/randomfakehtml/archive/refs/heads/master.zip
+        unzip -q master.zip && rm -f master.zip
+    fi
+
+    cd randomfakehtml-master || exit 1
+    rm -rf assets ".gitattributes" "README.md" "_config.yml"
+
+    # Pick a random template directory
+    RandomHTML=$(find . -maxdepth 1 -type d ! -name '.' | sed 's|^\./||' | shuf -n1)
+    echo "Random template name: ${RandomHTML}"
+
+    # Copy to web directory, but don't delete post.php
+    if [[ -d "${RandomHTML}" && -d "/var/www/html/" ]]; then
+        # Remove everything except post.php (files and directories)
+        find /var/www/html/ ! -name 'post.php' -type f -exec rm -f {} +
+        find /var/www/html/ ! -name 'post.php' -type d -mindepth 1 -exec rm -rf {} +
+
+        cp -a "${RandomHTML}/." /var/www/html/
+        echo "Template extracted successfully!"
+    else
+        echo "Extraction error!"
+    fi
+}
 
 # ==============================================
 # MAIN MENU
@@ -813,6 +847,7 @@ show_menu() {
     echo -e "6) Check system status"
     echo -e "7) Uninstall everything full wipe "
     echo -e "${GREEN}8) Send whitelist link via Telegram${NC}"
+    echo -e "9) Random FakeHtml "
     echo -e "0) Exit${NC}"
     echo -e "==========================================="
     
@@ -850,6 +885,12 @@ show_menu() {
         check_root
         generate_token_url   # This should set $WHITELIST_LINK
         send_whitelist_link_telegram
+        ;;
+   9)
+        check_root
+        apt-get update
+        apt-get install unzip -y
+        random_template_site
         ;;
 
       0)
