@@ -91,7 +91,7 @@ tweak.
    - 6:Check system status.
    - 7:Uninstall everything (full wipe).
    - 8:Send whitelist link via Telegram.
-   - 9Install random fake HTML site (for plausible deniability).
+   - 9:Install random fake HTML site (for plausible deniability).
     - 0:Exit.
 
 ### Advanced Features
