@@ -84,7 +84,7 @@ tweak.
 ### Installation
 - 1) install python-mtproto-proxy by Alexander Bersenev  https://github.com/alexbers/mtprotoproxy   
 
-- 2)Run the script and choose option  `2` to install everything:
+- 2) Run the script and choose option  `2` to install everything:
 
 - NGINX with stream support
 - PHP-FPM
@@ -117,6 +117,11 @@ If neeDeD, run option `4` to fix file permissions for PHP and NGINX access.
 Choose option `7` to remove all installed components, configuration files, and stop NGINX.
 
 ---
+### Advanced Features
+
+    Telegram Notification: Send whitelist links directly to users via Telegram Bot API.
+    Random Fake HTML: Deploy random static sites to obscure the real gateway.
+    Automated Backups: Config and data files are preserved before changes.
 
 ## Configuration
 
@@ -149,7 +154,7 @@ Choose option `7` to remove all installed components, configuration files, and s
 - make sure ufw is active and enable with the nginx stream port allowed and http or https
 - u can see the allowed ip in the nginx folder most settings are in nginx folder
 ---
-##Credits
+## Credits
 
     MTProto Proxy: alexbers/python-telegram-mtproto-proxy and seriyps/mtproto-proxy
     Random Fake HTML by GFW4Fun
