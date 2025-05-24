@@ -83,16 +83,16 @@ tweak.
 
 # Main Menu Options
 
-   - 1:Install MTProto Proxy only (choose Python or Erlang version).
-   - 2:Install everything (recommended for most users).
-   - 3:Generate access URL with tokens (for safe IP whitelisting).
-   - 4:Fix permissions (repair file/directory permissions).
-   - 5:Change whitelist password.
-   - 6:Check system status.
-   - 7:Uninstall everything (full wipe).
-   - 8:Send whitelist link via Telegram.
-   - 9:Install random fake HTML site (for plausible deniability).
-    - 0:Exit.
+   - 1 Install MTProto Proxy only (choose Python or Erlang version).
+   - 2 Install everything (recommended for most users).
+   - 3 Generate access URL with tokens (for safe IP whitelisting).
+   - 4 Fix permissions (repair file/directory permissions).
+   - 5 Change whitelist password.
+   - 6 Check system status.
+   - 7 Uninstall everything (full wipe).
+   - 8 Send whitelist link via Telegram.
+   - 9 Install random fake HTML site (for plausible deniability).
+    - 0 Exit.
 
 ### Advanced Features
 
