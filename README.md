@@ -10,7 +10,8 @@ dos2unix start.sh &&\
 chmod +x start.sh && \
 bash start.sh
 ```
-Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0  or first install mtproto
+- 0: Make sure Telegram proxy Listen on 127.0.0.1 insted of just 0.0.0.0 not really just first install mtproto. 
+- 1: Change the the user sharedlink mtprotoproxy proxy port  to 8443 or ur nginx stream port  . 
 # MTProto Proxy Whitelist Installer
 
 This script automates the installation and management of an MTProto Telegram Proxy whitelist system protected by NGINX and PHP. It sets up a secure and fast reverse proxy environment to avoid detection by firewalls like the Great Firewall (GFW) it should work for other kind of proxy servers with little 
@@ -80,42 +81,24 @@ tweak.
 
 ## Usage
 
-### Installation
-- 1) install python-mtproto-proxy by Alexander Bersenev  https://github.com/alexbers/mtprotoproxy   
+# Main Menu Options
 
-- 2)Run the script and choose option  `2` to install everything:
+   - 1 Install MTProto Proxy only (choose Python or Erlang version).
+   - 2 Install everything (recommended for most users).
+   - 3 Generate access URL with tokens (for safe IP whitelisting).
+   - 4 Fix permissions (repair file/directory permissions).
+   - 5 Change whitelist password.
+   - 6 Check system status.
+   - 7 Uninstall everything (full wipe).
+   - 8 Send whitelist link via Telegram.
+   - 9 Install random fake HTML site (for plausible deniability).
+   - 0 Exit.
 
-- NGINX with stream support
-- PHP-FPM
-- Certbot for HTTPS certificate (for domain or IP)
-- Whitelist system files and configuration
-- Permissions are fixed automatically
+### Advanced Features
 
-### Generate Access URLs and Tokens
-3)
-Choose option `3` in the script menu. It will print:
-
-- One-time token URL (use once for 30days)
-- 15-minute token URL (use multiple times within 15 minutes)
-
-Example:
-
-```
-https://yourdomain:8443/post.php?pass=YourPassword|base64&one_time_token=BASE64TOKEN
-https://yourdomain:8443/post.php?pass=YourPassword|base64&five_min_token=BASE64TOKEN
-```
-
-Use these URLs to add your client IP to the whitelist.
-
-### Fix Permissions
-
-If neeDeD, run option `4` to fix file permissions for PHP and NGINX access.
-
-### Uninstall
-
-Choose option `7` to remove all installed components, configuration files, and stop NGINX.
-
----
+    Telegram Notification: Send whitelist links directly to users via Telegram Bot API.
+    Random Fake HTML: Deploy random static sites to obscure the real gateway.
+    Automated Backups: Config and data files are preserved before changes.
 
 ## Configuration
 
@@ -148,3 +131,7 @@ Choose option `7` to remove all installed components, configuration files, and s
 - make sure ufw is active and enable with the nginx stream port allowed and http or https
 - u can see the allowed ip in the nginx folder most settings are in nginx folder
 ---
+## Credits
+
+    MTProto Proxy: alexbers/python-telegram-mtproto-proxy and seriyps/mtproto-proxy
+    Random Fake HTML by GFW4Fun

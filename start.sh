@@ -202,6 +202,19 @@ install_mtproto_proxy() {
   log "${GREEN}MTProto Proxy installed successfully${NC}"
 }
 
+# Install MTProto Proxy (Method 2 - alternative)
+install_mtproto_proxy_method2() {
+  log "Installing MTProto Proxy (Method 2)..."
+  cd /opt || error_exit "Failed to change to /opt directory"
+  if curl -L -o mtp_install.sh https://git.io/fj5ru; then
+    chmod +x mtp_install.sh || error_exit "Failed to make installer executable"
+    bash mtp_install.sh || error_exit "MTProto Proxy installation failed"
+  else
+    error_exit "Failed to download mtp_install.sh"
+  fi
+  log "${GREEN}MTProto Proxy installed successfully (Method 2)${NC}"
+}
+
 # Install NGINX with stream module
 install_nginx_with_stream() {
   log "Installing NGINX with stream module..."
@@ -466,10 +479,10 @@ server {
     ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
-    ssl_stapling on;
-    ssl_stapling_verify on;
-    resolver 8.8.8.8 8.8.4.4 valid=300s;
-    resolver_timeout 5s;
+#    ssl_stapling on;
+#    ssl_stapling_verify on;
+#    resolver 8.8.8.8 8.8.4.4 valid=300s;
+#    resolver_timeout 5s;
 
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
     add_header X-Frame-Options DENY;
@@ -606,6 +619,31 @@ generate_token_url() {
   echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_5MIN"
 
   echo -e "\n${YELLOW}NOTE:${NC} Use one-time token once only, 15-minute token can be used multiple times within 15 mins."
+}
+#
+send_whitelist_link_telegram() {
+    read -p "Enter your API Bot token: " BOT_TOKEN
+    read -p "Enter user's Telegram chat ID: " CHAT_ID
+
+    # Remove newlines from TOKEN_OT (just in case)
+    TOKEN_OT=$(echo "$TOKEN_OT" | tr -d '\n')
+
+    WHITELIST_LINK="https://${DOMAIN}/post.php?pass=${PASS_B64}&token=${TOKEN_OT}"
+
+    MESSAGE="Your  whitelist link (valid for a limited time):
+${WHITELIST_LINK}"
+
+    response=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        -d chat_id="${CHAT_ID}" \
+        --data-urlencode text="${MESSAGE}" \
+        -d parse_mode="Markdown")
+
+    echo "Telegram API response: $response"
+    if echo "$response" | grep -q '"ok":true'; then
+        echo "Whitelist link sent to Telegram user ${CHAT_ID}."
+    else
+        echo "Failed to send Telegram message."
+    fi
 }
 
 # Check files and permissions
@@ -771,6 +809,40 @@ install_all() {
   log "${GREEN}Installation completed successfully!${NC}"
   show_status
 }
+#Random HTML
+random_template_site() {
+    # Check for dependencies
+    for cmd in wget unzip shuf; do
+        command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd not found!"; exit 1; }
+    done
+
+    # Download and extract randomfakehtml if not present
+    cd "$HOME" || exit 1
+
+    if [[ ! -d "randomfakehtml-master" ]]; then
+        wget -q https://github.com/GFW4Fun/randomfakehtml/archive/refs/heads/master.zip
+        unzip -q master.zip && rm -f master.zip
+    fi
+
+    cd randomfakehtml-master || exit 1
+    rm -rf assets ".gitattributes" "README.md" "_config.yml"
+
+    # Pick a random template directory
+    RandomHTML=$(find . -maxdepth 1 -type d ! -name '.' | sed 's|^\./||' | shuf -n1)
+    echo "Random template name: ${RandomHTML}"
+
+    # Copy to web directory, but don't delete post.php
+    if [[ -d "${RandomHTML}" && -d "/var/www/html/" ]]; then
+        # Remove everything except post.php (files and directories)
+        find /var/www/html/ ! -name 'post.php' -type f -exec rm -f {} +
+        find /var/www/html/ ! -name 'post.php' -type d -mindepth 1 -exec rm -rf {} +
+
+        cp -a "${RandomHTML}/." /var/www/html/
+        echo "Template extracted successfully!"
+    else
+        echo "Extraction error!"
+    fi
+}
 
 # ==============================================
 # MAIN MENU
@@ -786,7 +858,9 @@ show_menu() {
     echo -e "4) Fix permissions"
     echo -e "5) Change Whitelist Password"
     echo -e "6) Check system status"
-    echo -e "7) Uninstall everything"
+    echo -e "7) Uninstall everything full wipe "
+    echo -e "${GREEN}8) Send whitelist link via Telegram${NC}"
+    echo -e "9) Random FakeHtml "
     echo -e "0) Exit${NC}"
     echo -e "==========================================="
     
@@ -794,7 +868,19 @@ show_menu() {
     case $choice in
       1)
         check_root
-        install_mtproto_proxy
+        echo -e "${GREEN}Choose MTProto Proxy installation method:${NC}"
+        echo "1) Method 1 Python Proxy by alexbers (git.io/fjo34 - Original)"
+        echo "2) Method 2 @seriyps creator of the Erlang Proxy (git.io/fj5ru - Alternative)"
+        read -p "Enter 1 or 2: " mtp_choice
+        case "$mtp_choice" in
+        1) install_mtproto_proxy
+;;
+        2) install_mtproto_proxy_method2 
+;;
+        *) echo -e "${RED}Invalid choice.${NC}" 
+;;
+        esac
+        
         ;;
       2)
         install_all
@@ -819,6 +905,19 @@ show_menu() {
         check_root
         uninstall
         ;;
+
+      8)
+        check_root
+        generate_token_url   # This should set $WHITELIST_LINK
+        send_whitelist_link_telegram
+        ;;
+   9)
+        check_root
+        apt-get update
+        apt-get install unzip -y
+        random_template_site
+        ;;
+
       0)
         echo -e "${BLUE}Exiting...${NC}"
         exit 0
