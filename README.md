@@ -81,42 +81,19 @@ tweak.
 
 ## Usage
 
-### Installation
-- 1) install python-mtproto-proxy by Alexander Bersenev  https://github.com/alexbers/mtprotoproxy   
+### Main Menu Options
 
-- 2) Run the script and choose option  `2` to install everything:
+1:  Install MTProto Proxy only (choose Python or Erlang version)
+2:  Install everything (recommended for most users)
+3:  Generate access URL with tokens (for safe IP whitelisting)
+4:  Fix permissions (repair file/directory permissions)
+5:  Change whitelist password
+6:  Check system status
+7:  Uninstall everything (full wipe)
+8:  Send whitelist link via Telegram
+9:  Install random fake HTML site (for plausible deniability)
+0:  Exit
 
-- NGINX with stream support
-- PHP-FPM
-- Certbot for HTTPS certificate (for domain or IP)
-- Whitelist system files and configuration
-- Permissions are fixed automatically
-
-### Generate Access URLs and Tokens
-3)
-Choose option `3` in the script menu. It will print:
-
-- One-time token URL (use once for 30days)
-- 15-minute token URL (use multiple times within 15 minutes)
-
-Example:
-
-```
-https://yourdomain:8443/post.php?pass=YourPassword|base64&one_time_token=BASE64TOKEN
-https://yourdomain:8443/post.php?pass=YourPassword|base64&five_min_token=BASE64TOKEN
-```
-
-Use these URLs to add your client IP to the whitelist.
-
-### Fix Permissions
-
-If neeDeD, run option `4` to fix file permissions for PHP and NGINX access.
-
-### Uninstall
-
-Choose option `7` to remove all installed components, configuration files, and stop NGINX.
-
----
 ### Advanced Features
 
     Telegram Notification: Send whitelist links directly to users via Telegram Bot API.
