@@ -149,3 +149,7 @@ Choose option `7` to remove all installed components, configuration files, and s
 - make sure ufw is active and enable with the nginx stream port allowed and http or https
 - u can see the allowed ip in the nginx folder most settings are in nginx folder
 ---
+##Credits
+
+    MTProto Proxy: alexbers/python-telegram-mtproto-proxy and seriyps/mtproto-proxy
+    Random Fake HTML by GFW4Fun
