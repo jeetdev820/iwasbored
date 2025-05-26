@@ -27,7 +27,7 @@ NGINX_SITES_LINK="$NGINX_CONF_DIR/sites-enabled/whitelist_gateway"
 WHITELIST_SITE_CONF="$NGINX_SITES_DIR/whitelist_gateway"
 STREAM_CONF_FILE="$NGINX_CONF_DIR/stream.d/mtproto.conf"
 BACKUP_DIR="/var/backups/mtproxy-whitelist"
-TELEGRAM_USERS_FILE="$NGINX_CONF_DIR/telegram_users.txt" # File to store Telegram users
+TELEGRAM_USERS_FILE="$NGINX_CONF_DIR/telegram_users.txt" # File to store Telegram users (username:chat_id:proxy_address)
 TELEGRAM_BOT_TOKEN_FILE="$NGINX_CONF_DIR/mtproxy-whitelist.conf.telegram_token" # File to store Telegram Bot Token
 
 # Colors
@@ -80,7 +80,7 @@ validate_domain() {
   if [[ -z "$domain" ]]; then
     error_exit "Domain cannot be empty."
   fi
-  
+
   # Simple domain validation regex
   if ! [[ "$domain" =~ ^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.)+[a-zA-Z]{2,}$ ]]; then
     error_exit "Invalid domain format: $domain"
@@ -124,7 +124,7 @@ check_dependencies() {
   install_ufw_if_missing
   install_unzip_if_missing
   install_dig_if_missing
-  local dependencies=("curl" "openssl" "ufw" "systemctl" "shuf" "dig") 
+  local dependencies=("curl" "openssl" "ufw" "systemctl" "shuf" "dig")
   for dep in "${dependencies[@]}"; do
     if ! command -v "$dep" >/dev/null 2>&1; then
       error_exit "Missing required dependency: $dep"
@@ -171,7 +171,7 @@ create_backup() {
   mkdir -p "$BACKUP_DIR"
   local timestamp=$(date +%Y%m%d-%H%M%S)
   local backup_file="$BACKUP_DIR/config-$timestamp.tar.gz"
-  
+
   # Using || true to prevent script from exiting if some files are missing during backup
   tar -czf "$backup_file" \
     "$WHITE_LIST_FILE" \
@@ -180,8 +180,8 @@ create_backup() {
     "$NGINX_CONF_DIR" \
     "$WEB_DIR/post.php" \
     "$TELEGRAM_USERS_FILE" \
-    "$TELEGRAM_BOT_TOKEN_FILE" || true 
-    
+    "$TELEGRAM_BOT_TOKEN_FILE" || true
+
   if [[ $? -eq 0 ]]; then
     log "Backup created: ${GREEN}$backup_file${NC}"
   else
@@ -202,7 +202,7 @@ get_php_version() {
 check_domain_resolution() {
     local domain="$1"
     log "Checking if domain '$domain' resolves to this server's IP..."
-    
+
     local public_ip=$(curl -s ifconfig.me)
     if [[ -z "$public_ip" ]]; then
         error_exit "Could not determine this server's public IP. Check internet connectivity."
@@ -219,23 +219,46 @@ check_domain_resolution() {
     log "${GREEN}Domain '$domain' successfully resolves to this server's IP.${NC}"
 }
 
-# Add Telegram user to file
+# Add Telegram user to file (updated to include proxy_address)
 add_telegram_user() {
     local username="$1"
     local chat_id="$2"
-    
-    if grep -q "^$username:$chat_id$" "$TELEGRAM_USERS_FILE"; then
-        log "${YELLOW}Telegram user '$username' with chat ID '$chat_id' already exists.${NC}"
-        return
+    local proxy_address="${3:-}" # Optional proxy_address, default to empty
+
+    # Escape potential colons in username to prevent issues with IFS later
+    # This also handles the proxy address being the last field correctly.
+    local escaped_username=$(echo "$username" | sed 's/:/\\:/g')
+
+    # Check if user already exists based on escaped username and chat_id
+    if grep -q "^${escaped_username}:${chat_id}:" "$TELEGRAM_USERS_FILE" || \
+       grep -q "^${escaped_username}:${chat_id}$" "$TELEGRAM_USERS_FILE"; then # Also check old format without proxy
+        log "${YELLOW}Telegram user '${username}' with chat ID '${chat_id}' already exists. Updating entry.${NC}"
+        # Update existing entry by deleting and re-adding
+        # Use awk to find the line and replace, ensuring the new line is correctly formatted
+        # This is safer than sed -i /c\ for handling potential colons in old/new proxy address
+        awk -v old_user="${escaped_username}" -v old_chat="${chat_id}" -v new_line="${escaped_username}:${chat_id}:${proxy_address}" '
+            BEGIN { found = 0 }
+            $0 ~ "^" old_user ":" old_chat "(:|$)" {
+                print new_line
+                found = 1
+            }
+            !($0 ~ "^" old_user ":" old_chat "(:|$)") {
+                print $0
+            }
+            END { if (found == 0) print new_line } # Add if not found (edge case for initial adding)
+        ' "$TELEGRAM_USERS_FILE" > "${TELEGRAM_USERS_FILE}.tmp" && \
+        mv "${TELEGRAM_USERS_FILE}.tmp" "$TELEGRAM_USERS_FILE" || error_exit "Failed to update Telegram user"
+
+    else
+        echo "${escaped_username}:${chat_id}:${proxy_address}" >> "$TELEGRAM_USERS_FILE" || error_exit "Failed to save Telegram user"
     fi
 
-    echo "$username:$chat_id" >> "$TELEGRAM_USERS_FILE" || error_exit "Failed to save Telegram user"
     chmod 600 "$TELEGRAM_USERS_FILE" || error_exit "Failed to set permissions for Telegram users file"
     chown www-data:www-data "$TELEGRAM_USERS_FILE" || error_exit "Failed to set ownership for Telegram users file"
-    log "${GREEN}Telegram user '$username' (ID: $chat_id) saved.${NC}"
+    log "${GREEN}Telegram user '${username}' (ID: ${chat_id}) saved/updated.${NC}"
 }
 
-# List Telegram users
+# List Telegram users (updated to display proxy_address)
 list_telegram_users() {
     if [[ ! -f "$TELEGRAM_USERS_FILE" ]] || [[ ! -s "$TELEGRAM_USERS_FILE" ]]; then
         echo -e "${YELLOW}No saved Telegram users found.${NC}"
@@ -244,13 +267,114 @@ list_telegram_users() {
 
     echo -e "\n${BLUE}Saved Telegram Users:${NC}"
     local i=1
-    while IFS= read -r line || [[ -n "$line" ]]; do
+    # Read line by line, then use cut to safely parse fields, especially the last one
+    while read -r line || [[ -n "$line" ]]; do
         local username=$(echo "$line" | cut -d':' -f1)
         local chat_id=$(echo "$line" | cut -d':' -f2)
-        echo -e "${GREEN}$i) Username: $username, Chat ID: $chat_id${NC}"
+        local proxy_address=$(echo "$line" | cut -d':' -f3-) # Get everything from the 3rd field onwards
+
+        # Unescape username if it was escaped for display
+        local display_username=$(echo "$username" | sed 's/\\:/!COLON!/g' | sed 's/:/ /g' | sed 's/!COLON!/:/g')
+        local display_proxy=""
+        if [[ -n "$proxy_address" ]]; then
+            display_proxy=", Proxy: $proxy_address"
+        fi
+        echo -e "${GREEN}$i) Username: $display_username, Chat ID: $chat_id${display_proxy}${NC}"
         ((i++))
     done < "$TELEGRAM_USERS_FILE"
     return 0
+}
+
+# Delete Telegram user
+delete_telegram_user() {
+    local user_num="$1"
+    if [[ ! -f "$TELEGRAM_USERS_FILE" ]] || [[ ! -s "$TELEGRAM_USERS_FILE" ]]; then
+        log "${YELLOW}No Telegram users to delete.${NC}"
+        return
+    fi
+
+    local num_users=$(wc -l < "$TELEGRAM_USERS_FILE")
+    if (( user_num < 1 || user_num > num_users )); then
+        error_exit "Invalid user number: $user_num"
+    fi
+
+    local user_line=$(sed -n "${user_num}p" "$TELEGRAM_USERS_FILE")
+    local username=$(echo "$user_line" | cut -d':' -f1) # Safely get username
+
+    sed -i "${user_num}d" "$TELEGRAM_USERS_FILE" || error_exit "Failed to delete Telegram user."
+    chmod 600 "$TELEGRAM_USERS_FILE" || error_exit "Failed to set permissions for Telegram users file"
+    chown www-data:www-data "$TELEGRAM_USERS_FILE" || error_exit "Failed to set ownership for Telegram users file"
+    log "${GREEN}Telegram user '${username}' deleted successfully.${NC}"
+}
+
+# Manage Telegram users menu
+manage_telegram_users_menu() {
+    while true; do
+        clear
+        echo -e "${BLUE}==== Manage Telegram Users ====${NC}"
+        list_telegram_users # List existing users
+
+        echo -e "\n${GREEN}1) Add New Telegram User"
+        echo -e "2) Edit Existing Telegram User"
+        echo -e "3) Delete Telegram User"
+        echo -e "0) Back to Main Menu${NC}"
+        echo -e "==========================================="
+
+        read -p "Choose an option: " choice
+        case $choice in
+            1)
+                read -p "Enter recipient's Telegram Chat ID: " CHAT_ID
+                read -p "Enter a username for this recipient (e.g., 'JohnDoe'): " USERNAME
+                read -p "Enter Telegram proxy link (optional, e.g., 'https://t.me/proxy?server=...'): " TELEGRAM_PROXY_LINK_TO_SAVE
+                add_telegram_user "$USERNAME" "$CHAT_ID" "$TELEGRAM_PROXY_LINK_TO_SAVE"
+                ;;
+            2)
+                if list_telegram_users; then
+                    read -p "Enter the number of the user to edit: " user_num
+                    local num_users=$(wc -l < "$TELEGRAM_USERS_FILE")
+                    if (( user_num < 1 || user_num > num_users )); then
+                        echo -e "${RED}Invalid user number.${NC}"
+                    else
+                        local current_line=$(sed -n "${user_num}p" "$TELEGRAM_USERS_FILE")
+                        # Use cut to safely parse the current line
+                        local current_username=$(echo "$current_line" | cut -d':' -f1)
+                        local current_chat_id=$(echo "$current_line" | cut -d':' -f2)
+                        local current_proxy_address=$(echo "$current_line" | cut -d':' -f3-) # Get full proxy link
+
+                        echo -e "${YELLOW}Editing user: $(echo "$current_username" | sed 's/\\:/!COLON!/g' | sed 's/:/ /g' | sed 's/!COLON!/:/g') (Chat ID: ${current_chat_id}, Proxy: ${current_proxy_address})${NC}"
+                        read -p "Enter new username (current: ${current_username}, press Enter to keep): " new_username
+                        new_username=${new_username:-$current_username}
+                        read -p "Enter new Chat ID (current: ${current_chat_id}, press Enter to keep): " new_chat_id
+                        new_chat_id=${new_chat_id:-$current_chat_id}
+                        read -p "Enter new Telegram proxy link (current: ${current_proxy_address}, press Enter to keep, or enter 'none' to clear): " new_proxy_link
+                        if [[ "$new_proxy_link" == "none" ]]; then
+                            new_proxy_link=""
+                        else
+                            new_proxy_link=${new_proxy_link:-$current_proxy_address}
+                        fi
+
+                        # Delete old entry and add new one
+                        delete_telegram_user "$user_num" # Temporarily delete to rewrite
+                        add_telegram_user "$new_username" "$new_chat_id" "$new_proxy_link"
+                        log "${GREEN}User '$(echo "$new_username" | sed 's/\\:/!COLON!/g' | sed 's/:/ /g' | sed 's/!COLON!/:/g')' updated successfully.${NC}"
+                    fi
+                fi
+                ;;
+            3)
+                if list_telegram_users; then
+                    read -p "Enter the number of the user to delete: " user_num
+                    delete_telegram_user "$user_num"
+                fi
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option. Please try again.${NC}"
+                ;;
+        esac
+        read -p "Press Enter to continue..."
+    done
 }
 
 
@@ -261,14 +385,14 @@ list_telegram_users() {
 # Setup UFW firewall rules
 setup_ufw_rules() {
   log "Configuring UFW firewall rules..."
-  
+
   ufw --force reset || error_exit "Failed to reset UFW"
   ufw default deny incoming || error_exit "Failed to set UFW defaults"
   ufw default allow outgoing || error_exit "Failed to set UFW defaults"
   ufw limit ssh || error_exit "Failed to configure SSH in UFW"
   ufw allow http/tcp || error_exit "Failed to allow HTTP (port 80)"
   ufw allow https/tcp || error_exit "Failed to allow HTTPS (port 443)"
-  
+
   if [[ -n "$NGINX_PORT" ]]; then
     ufw allow "$NGINX_PORT"/tcp comment "NGINX Whitelist Gateway Port" || error_exit "Failed to allow NGINX whitelist port"
   fi
@@ -276,7 +400,7 @@ setup_ufw_rules() {
   if [[ -n "$PROXY_PORT" ]]; then
     ufw allow "$PROXY_PORT"/tcp comment "MTProto Proxy Port" || error_exit "Failed to allow MTProto proxy port"
   fi
-  
+
   ufw --force enable || error_exit "Failed to enable UFW"
   log "${GREEN}Firewall configured successfully${NC}"
 }
@@ -284,13 +408,13 @@ setup_ufw_rules() {
 # Install MTProto Proxy
 install_mtproto_proxy() {
   log "Installing MTProto Proxy..."
-  
+
   cd /opt || error_exit "Failed to change to /opt directory"
-  
+
   # Download with retry logic
   local retries=3
   local success=false
-  
+
   for ((i=1; i<=retries; i++)); do
     log "Downloading MTProto Proxy installer (attempt $i/$retries)..."
     if curl -o MTProtoProxyInstall.sh -L https://git.io/fjo34; then
@@ -299,14 +423,14 @@ install_mtproto_proxy() {
     fi
     sleep 5
   done
-  
+
   if [[ "$success" != true ]]; then
     error_exit "Failed to download MTProtoProxyInstall.sh after $retries attempts"
   fi
-  
+
   chmod +x MTProtoProxyInstall.sh || error_exit "Failed to make installer executable"
   bash MTProtoProxyInstall.sh || error_exit "MTProto Proxy installation failed"
-  
+
   log "${GREEN}MTProto Proxy installed successfully${NC}"
 }
 
@@ -326,12 +450,12 @@ install_mtproto_proxy_method2() {
 # Install NGINX with stream module
 install_nginx_with_stream() {
   log "Installing NGINX with stream module..."
-  
+
   apt install -y ufw fail2ban nginx libnginx-mod-stream || error_exit "Failed to install packages"
-  
+
   mkdir -p /etc/nginx/stream.d || error_exit "Failed to create stream.d directory"
   touch "$STREAM_CONF_FILE" || error_exit "Failed to create stream config file"
-  
+
   # Add stream block if not exists
   if ! grep -q "stream {" "$NGINX_STREAM_CONF"; then
     sed -i "/http {/i \\
@@ -339,33 +463,33 @@ stream {\\
     include /etc/nginx/stream.d/*.conf;\\
 }" "$NGINX_STREAM_CONF" || error_exit "Failed to modify nginx.conf"
   fi
-  
+
   log "${GREEN}NGINX installed successfully${NC}"
 }
 
 # Install PHP
 install_php() {
   log "Installing PHP..."
-  
+
   apt install -y php php-cli php-fpm php-curl || error_exit "Failed to install PHP packages"
   get_php_version
-  
+
   log "${GREEN}PHP $PHP_VERSION installed successfully${NC}"
 }
 
 # Install Certbot
 install_certbot() {
   log "Installing Certbot..."
-  
+
   apt install -y certbot python3-certbot-nginx || error_exit "Failed to install Certbot"
-  
+
   log "${GREEN}Certbot installed successfully${NC}"
 }
 
 # Create password file
 create_password() {
   log "Creating password file..."
-  
+
   while true; do
     read -p "Enter new password for IP whitelist page (min 12 chars): " -s PASSWORD
     echo
@@ -374,32 +498,32 @@ create_password() {
     fi
     echo -e "${YELLOW}Password must be at least 12 characters long.${NC}"
   done
-  
+
   read -p "Confirm new password: " -s PASSWORD_CONFIRM
   echo
-  
+
   if [[ "$PASSWORD" != "$PASSWORD_CONFIRM" ]]; then
     error_exit "Passwords do not match!"
   fi
-  
+
   SALT=$(openssl rand -hex 8) || error_exit "Failed to generate salt"
   HASHED_PASSWORD=$(echo -n "$PASSWORD$SALT" | sha256sum | awk '{print $1}') || error_exit "Failed to hash password"
-  
+
   echo "$HASHED_PASSWORD:$SALT" > "$PASSWORD_FILE" || error_exit "Failed to create password file"
   chmod 600 "$PASSWORD_FILE" || error_exit "Failed to set password file permissions"
   chown www-data:www-data "$PASSWORD_FILE" || error_exit "Failed to set password file ownership"
-  
+
   log "${GREEN}Password file created successfully${NC}"
 }
 
 # Create necessary files and set permissions
 create_files_and_permissions() {
   log "Creating files and setting permissions..."
-  
+
   mkdir -p "$WEB_DIR" || error_exit "Failed to create web directory"
   touch "$WHITE_LIST_FILE" || error_exit "Failed to create whitelist file"
   chmod 644 "$WHITE_LIST_FILE" || error_exit "Failed to set whitelist file permissions"
-  
+
   touch "$USED_TOKENS_FILE" || error_exit "Failed to create used tokens file"
   chmod 600 "$USED_TOKENS_FILE" || error_exit "Failed to set tokens file permissions"
 
@@ -407,9 +531,9 @@ create_files_and_permissions() {
   chmod 600 "$TELEGRAM_USERS_FILE" || error_exit "Failed to set permissions for Telegram users file"
   chown www-data:www-data "$TELEGRAM_USERS_FILE" || error_exit "Failed to set ownership for Telegram users file"
 
-  touch "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to create Telegram bot token file" 
+  touch "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to create Telegram bot token file"
   chmod 600 "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set permissions for Telegram bot token file."
-  chown root:root "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set ownership for Telegram bot token file." 
+  chown root:root "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set ownership for Telegram bot token file."
 
   if [[ ! -f "$PASSWORD_FILE" ]]; then
     create_password
@@ -420,7 +544,7 @@ create_files_and_permissions() {
     HASHED_PASSWORD="${passdata%%:*}"
     SALT="${passdata##*:}"
   fi
-  
+
   # Create PHP script (Logic for long links with pass/token)
   cat > "$WEB_DIR/post.php" <<'EOF'
 <?php
@@ -511,7 +635,7 @@ if (is_one_time_token_valid($token, $secret, $used_tokens_file)) {
 // Prepare the new entry with a timestamp
 $timestamp = date('Y-m-d H:i:s');
 $new_entry_base = "allow $ip;";
-$new_entry_with_timestamp = "$new_entry_base # added $timestamp\n"; 
+$new_entry_with_timestamp = "$new_entry_base # added $timestamp\n";
 
 $existing_lines = file_exists($whitelist_file) ? file($whitelist_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
 
@@ -534,14 +658,15 @@ if (!$ip_already_whitelisted) {
 EOF
 
   chmod 644 "$WEB_DIR"/*.php || error_exit "Failed to set PHP file permissions"
-  
+
   log "${GREEN}Files created and permissions set successfully${NC}"
 }
 
 # Setup NGINX site configuration (Includes robust PHP processing)
+# Setup NGINX site configuration (Includes robust PHP processing)
 setup_nginx_site() {
   log "Configuring NGINX site..."
-  
+
   while true; do
     read -p "Enter your domain (must already point to this server): " DOMAIN
     validate_domain "$DOMAIN" && break
@@ -549,22 +674,21 @@ setup_nginx_site() {
 
   # Pre-flight check: Domain resolution
   check_domain_resolution "$DOMAIN"
-  
+
   while true; do
     read -p "Enter your Telegram proxy port (e.g., 48500): " -i "48500" -e PROXY_PORT # Added default
     validate_port "$PROXY_PORT" && break
   done
-  
+
   while true; do
     read -p "Enter NGINX whitelist gateway port (e.g., 8443): " -i "8443" -e NGINX_PORT # Added default
     validate_port "$NGINX_PORT" && break
-  done
-  
+  done # <--- This `done` closes the while loop for NGINX_PORT
+
   get_php_version
   if [[ -z "$PHP_VERSION" ]]; then
     error_exit "PHP version could not be detected"
   fi
-
   # Prompt for proxy protocol configuration
   local use_proxy_protocol="n"
   read -p "Are you using a load balancer/proxy that sends PROXY protocol (e.g., Cloudflare, HAProxy)? [y/N]: " use_proxy_protocol
@@ -594,7 +718,7 @@ server {
 
   location ~ \.php\$ {
     # Ensure the PHP file exists before passing to FPM
-    try_files \$uri =404; 
+    try_files \$uri =404;
 
     fastcgi_split_path_info ^(.+\.php)(/.+)\$;
     fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock; # Uses detected PHP version
@@ -618,7 +742,7 @@ EOF
 
   # Create symlink
   ln -sf "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK" || error_exit "Failed to create NGINX symlink"
-  
+
   # Obtain SSL certificate
   log "Obtaining SSL certificate..."
   if ! certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN; then
@@ -675,7 +799,7 @@ server {
 
     location ~ \.php\$ {
         # Ensure the PHP file exists before passing to FPM
-        try_files \$uri =404; 
+        try_files \$uri =404;
 
         fastcgi_split_path_info ^(.+\.php)(/.+)\$;
         fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock; # Uses detected PHP version
@@ -708,7 +832,7 @@ server {
     proxy_pass 127.0.0.1:$PROXY_PORT;
     proxy_timeout 20m;
     proxy_connect_timeout 1s;
-    
+
     allow 127.0.0.1;
     include $WHITE_LIST_FILE;
     deny all;
@@ -718,29 +842,29 @@ EOF
   # Set secure permissions
   chmod 755 /etc/nginx || error_exit "Failed to set NGINX directory permissions" # Changed to 755 for broader access
   systemctl reload nginx || error_exit "Failed to reload NGINX"
-  
+
   save_config
-  
+
   log "${GREEN}NGINX site configured successfully${NC}"
 }
 
 # Fix permissions (also includes verification)
-fix_permissions() { 
+fix_permissions() {
   log "Fixing and Verifying permissions..."
-  
+
   chown -R www-data:www-data "$WEB_DIR" || error_exit "Failed to set web directory ownership"
   chown www-data:www-data "$PASSWORD_FILE" || error_exit "Failed to set password file ownership"
   chown www-data:www-data "$WHITE_LIST_FILE" || error_exit "Failed to set whitelist file ownership"
   chown www-data:www-data "$USED_TOKENS_FILE" || error_exit "Failed to set tokens file ownership"
   chown www-data:www-data "$TELEGRAM_USERS_FILE" || error_exit "Failed to set ownership for Telegram users file"
-  chown root:root "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set ownership for Telegram bot token file" 
+  chown root:root "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set ownership for Telegram bot token file"
 
   chmod 644 "$WEB_DIR"/*.php || error_exit "Failed to set PHP file permissions"
   chmod 600 "$PASSWORD_FILE" || error_exit "Failed to set password file permissions"
   chmod 600 "$WHITE_LIST_FILE" || error_exit "Failed to set whitelist file permissions"
   chmod 600 "$USED_TOKENS_FILE" || error_exit "Failed to set tokens file permissions"
   chmod 600 "$TELEGRAM_USERS_FILE" || error_exit "Failed to set permissions for Telegram users file"
-  chmod 600 "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set permissions for Telegram bot token file." 
+  chmod 600 "$TELEGRAM_BOT_TOKEN_FILE" || error_exit "Failed to set permissions for Telegram bot token file."
 
   chmod 755 /etc/nginx || error_exit "Failed to set NGINX directory permissions"
   chmod 755 /var/www || error_exit "Failed to set www directory permissions"
@@ -813,11 +937,11 @@ clean_old_whitelist_entries() {
     while IFS= read -r line; do
         # Extract timestamp from comment
         local timestamp_str=$(echo "$line" | sed -n 's/.*# added \([0-9\-]\{10\} [0-9:]\{8\}\)/\1/p')
-        
+
         if [[ -n "$timestamp_str" ]]; then
             # Convert timestamp string to seconds since epoch
             local entry_timestamp=$(date -d "$timestamp_str" +%s 2>/dev/null)
-            
+
             if [[ -n "$entry_timestamp" && "$((current_timestamp - entry_timestamp))" -lt "$expiry_seconds" ]]; then
                 echo "$line" >> "$temp_whitelist_file"
             else
@@ -844,7 +968,7 @@ clean_old_whitelist_entries() {
 # Generate token URL (Generates long links with pass/token)
 generate_token_url() {
   log "Generating access token URLs..."
-  
+
   if [[ ! -f "$PASSWORD_FILE" ]]; then
     error_exit "Password file not found! Please install first."
   fi
@@ -873,17 +997,20 @@ generate_token_url() {
   TIMESTAMP_5MIN=$(date +%s)
   TOKEN_HASH_5MIN=$(echo -n "${SECRET}${TIMESTAMP_5MIN}" | sha256sum | awk '{print $1}') || error_exit "Failed to generate token hash"
   TOKEN_RAW_5MIN="${TIMESTAMP_5MIN}:${TOKEN_HASH_5MIN}"
-  TOKEN_5MIN=$(echo -n "$TOKEN_RAW_5MIN" | base64 | tr -d '=' | tr '/+' '_-') || error_exit "Failed to encode token"
+  # Ensure no newlines or padding in base64 output
+  TOKEN_5MIN=$(echo -n "$TOKEN_RAW_5MIN" | base64 | tr -d '=' | tr -d '\n' | tr '/+' '_-') || error_exit "Failed to encode token"
+
 
   # Generate one-time token URL
   TIMESTAMP_OT=$(date +%s)
   TOKEN_HASH_OT=$(echo -n "${SECRET}${TIMESTAMP_OT}" | sha256sum | awk '{print $1}') || error_exit "Failed to generate token hash"
   TOKEN_RAW_OT="${TIMESTAMP_OT}:${TOKEN_HASH_OT}"
-  TOKEN_OT=$(echo -n "$TOKEN_RAW_OT" | base64 | tr -d '=' | tr '/+' '_-') || error_exit "Failed to encode token"
+  # Ensure no newlines or padding in base64 output
+  TOKEN_OT=$(echo -n "$TOKEN_RAW_OT" | base64 | tr -d '=' | tr -d '\n' | tr '/+' '_-') || error_exit "Failed to encode token"
 
   # Generate URLs
   PASS_B64=$(echo -n "$PASS_INPUT" | base64 | tr -d '=' | tr '/+' '_-') || error_exit "Failed to encode password"
-  
+
   echo -e "\n${GREEN}Your access URLs:${NC}"
   echo -e "1) ${BLUE}One-time token URL${NC} (valid for single use within 30 days):"
   echo "https://$DOMAIN/post.php?pass=$PASS_B64&token=$TOKEN_OT"
@@ -898,6 +1025,7 @@ send_whitelist_link_telegram() {
     local CURRENT_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" # Use the globally loaded token
     local CHAT_ID=""
     local USERNAME=""
+    local TELEGRAM_PROXY_LINK_TO_SEND="" # Renamed for clarity - this is the link to send to the user
     local choice=""
     local use_saved_token="n"
 
@@ -944,50 +1072,82 @@ send_whitelist_link_telegram() {
         save_telegram_bot_token "$BOT_TOKEN_INPUT"
         CURRENT_BOT_TOKEN="$BOT_TOKEN_INPUT"
     fi
-    
-    # Check for saved users
+
+
+ # --- Start of user-friendly improvements ---
     if list_telegram_users; then # This function returns 0 if users exist, 1 otherwise
+        echo -e "\n${BLUE}How would you like to send the whitelist link?${NC}"
         while true; do
-            read -p "Send to (E)xisting user or (N)ew user? [E/N]: " choice
+            read -p "  (E) Send to an existing saved user, or (N) Enter details for a new user? [E/N]: " choice
             choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
             if [[ "$choice" == "e" || "$choice" == "n" ]]; then
                 break
             else
-                echo -e "${RED}Invalid choice. Please enter 'E' or 'N'.${NC}"
+                echo -e "${RED}Invalid choice. Please type 'E' for existing or 'N' for new.${NC}"
             fi
         done
     else
         # No saved users, force new user entry
         choice="n"
-        echo -e "${YELLOW}No saved users found. You will enter a new user.${NC}"
+        echo -e "${YELLOW}No saved Telegram users found. You will be prompted to enter details for a new user.${NC}"
     fi
 
     if [[ "$choice" == "e" ]]; then
-        read -p "Enter the number of the user to send to: " user_num
-        local user_line=$(sed -n "${user_num}p" "$TELEGRAM_USERS_FILE")
-        if [[ -z "$user_line" ]]; then
-            error_exit "Invalid user number."
+        echo -e "\n${BLUE}Please enter the number of the user from the list above to send the link to.${NC}"
+        read -p "Enter user number (or 0 to go back): " user_num
+        if [[ "$user_num" -eq 0 ]]; then
+            log "${YELLOW}User selection cancelled.${NC}"
+            return # Exit the function if user cancels
         fi
+
+        local num_users=$(wc -l < "$TELEGRAM_USERS_FILE")
+        if (( user_num < 1 || user_num > num_users )); then
+            error_exit "${RED}Invalid user number: ${user_num}. Please choose a number from the list.${NC}"
+        fi
+
+        local user_line=$(sed -n "${user_num}p" "$TELEGRAM_USERS_FILE")
+        # Safely parse the line using cut
         USERNAME=$(echo "$user_line" | cut -d':' -f1)
         CHAT_ID=$(echo "$user_line" | cut -d':' -f2)
-        log "Selected existing user: $USERNAME (ID: $CHAT_ID)"
+        TELEGRAM_PROXY_LINK_TO_SEND=$(echo "$user_line" | cut -d':' -f3-) # Get everything from 3rd field onwards
+
+        log "Selected existing user: $(echo "$USERNAME" | sed 's/\\:/!COLON!/g' | sed 's/:/ /g' | sed 's/!COLON!/:/g') (ID: $CHAT_ID)"
+        if [[ -n "$TELEGRAM_PROXY_LINK_TO_SEND" ]]; then
+            log "Stored Telegram Proxy Link for user: ${TELEGRAM_PROXY_LINK_TO_SEND}"
+        fi
     else # choice == "n"
+        echo -e "\n${BLUE}Please enter the details for the new Telegram user.${NC}"
         read -p "Enter recipient's Telegram Chat ID: " CHAT_ID
         read -p "Enter a username for this recipient (e.g., 'JohnDoe'): " USERNAME
+        read -p "Enter Telegram proxy link (optional, e.g., 'https://t.me/proxy?server=...'): " TELEGRAM_PROXY_LINK_TO_SEND
     fi
+    # --- End of user-friendly improvements ---
 
     # Generate a fresh one-time token for sending via Telegram
     local TIMESTAMP_OT_TELEGRAM=$(date +%s)
     local TOKEN_HASH_OT_TELEGRAM=$(echo -n "${SECRET}${TIMESTAMP_OT_TELEGRAM}" | sha256sum | awk '{print $1}') || error_exit "Failed to generate token hash for Telegram"
     local TOKEN_RAW_OT_TELEGRAM="${TIMESTAMP_OT_TELEGRAM}:${TOKEN_HASH_OT_TELEGRAM}"
-    local TOKEN_OT_TELEGRAM=$(echo -n "$TOKEN_RAW_OT_TELEGRAM" | base64 | tr -d '=' | tr '/+' '_-') || error_exit "Failed to encode token for Telegram"
+    # Ensure no newlines or padding in base64 output
+    local TOKEN_OT_TELEGRAM=$(echo -n "$TOKEN_RAW_OT_TELEGRAM" | base64 | tr -d '=' | tr -d '\n' | tr '/+' '_-') || error_exit "Failed to encode token for Telegram"
 
     WHITELIST_LINK="https://${DOMAIN}/post.php?pass=${PASS_B64}&token=${TOKEN_OT_TELEGRAM}"
 
-    # *** MODIFIED PART FOR SHORTER LINK DISPLAY IN TELEGRAM ***
-    local LINK_TEXT="Click here to whitelist your IP" # This is the text the user will see
-    MESSAGE="Your whitelist link (valid for a limited time, one-time use): [${LINK_TEXT}](${WHITELIST_LINK})\n\nThis link is for one-time use and expires in 30 days. Please click it from the device whose IP you wish to whitelist."
-    # **********************************************************
+    # Construct the message including the whitelist link and optionally the proxy link
+    local LINK_TEXT="                1: Click here to whitelist your IP"
+    local MESSAGE="*Hello                           ${USERNAME}
+Your whitelist link* (valid for a limited time, one-time use): 
+    [${LINK_TEXT}](${WHITELIST_LINK})
+*This link is for one-time use and expires in 30 days.*
+* Please click it from the device whose IP you wish to whitelist.*"
+
+    # IMPORTANT: Do NOT include Bash color codes (${BLUE}, ${NC}) in the message sent to Telegram.
+    # They will break Markdown parsing.
+    if [[ -n "$TELEGRAM_PROXY_LINK_TO_SEND" ]]; then
+        MESSAGE+="
+*To configure your Telegram client with a proxy, click here:*
+                             2: [Proxy Link](${TELEGRAM_PROXY_LINK_TO_SEND})"
+        log "Adding Telegram proxy link to message: ${TELEGRAM_PROXY_LINK_TO_SEND}"
+    fi
 
     log "Attempting to send message to Telegram user ${CHAT_ID}..."
     response=$(curl -s -X POST "https://api.telegram.org/bot${CURRENT_BOT_TOKEN}/sendMessage" \
@@ -997,12 +1157,12 @@ send_whitelist_link_telegram() {
 
     echo "Telegram API response: $response"
     if echo "$response" | grep -q '"ok":true'; then
-        log "${GREEN}Whitelist link sent to Telegram user ${CHAT_ID}.${NC}"
+        log "${GREEN}Whitelist link sent to Telegram user $(echo "$USERNAME" | sed 's/\\:/!COLON!/g' | sed 's/:/ /g' | sed 's/!COLON!/:/g').${NC}"
         if [[ "$choice" == "n" ]]; then
             read -p "Do you want to save this user for future use? [y/N]: " save_user_choice
             save_user_choice=$(echo "$save_user_choice" | tr '[:upper:]' '[:lower:]')
             if [[ "$save_user_choice" == "y" ]]; then
-                add_telegram_user "$USERNAME" "$CHAT_ID"
+                add_telegram_user "$USERNAME" "$CHAT_ID" "$TELEGRAM_PROXY_LINK_TO_SEND" # Save the link to file
             fi
         fi
     else
@@ -1014,42 +1174,42 @@ send_whitelist_link_telegram() {
 # Show system status
 show_status() {
   echo -e "\n${BLUE}=== System Status ===${NC}"
-  
+
   # Check NGINX
   if systemctl is-active nginx >/dev/null; then
     echo -e "NGINX: ${GREEN}RUNNING${NC}"
   else
     echo -e "NGINX: ${RED}STOPPED${NC}"
   fi
-  
+
   # Check PHP-FPM
   if systemctl is-active "php$PHP_VERSION-fpm" >/dev/null; then
     echo -e "PHP-FPM: ${GREEN}RUNNING${NC}"
   else
     echo -e "PHP-FPM: ${RED}STOPPED${NC}"
   fi
-  
+
   # Check whitelist count
   if [[ -f "$WHITE_LIST_FILE" ]]; then
     echo -e "Whitelisted IPs: ${BLUE}$(grep -c '^allow' "$WHITE_LIST_FILE")${NC}" # Count lines starting with 'allow'
   else
     echo -e "Whitelist file: ${RED}MISSING${NC}"
   fi
-  
+
   # Check domain
   if [[ -n "$DOMAIN" ]]; then
     echo -e "Configured domain: ${BLUE}$DOMAIN${NC}"
   else
     echo -e "Domain: ${YELLOW}NOT CONFIGURED${NC}"
   fi
-  
+
   # Check ports
   if [[ -n "$PROXY_PORT" ]]; then
     echo -e "Proxy port: ${BLUE}$PROXY_PORT${NC}"
   else
     echo -e "Proxy port: ${YELLOW}NOT CONFIGURED${NC}"
   fi
-  
+
   if [[ -n "$NGINX_PORT" ]]; then
     echo -e "Whitelist port: ${BLUE}$NGINX_PORT${NC}"
   else
@@ -1101,9 +1261,9 @@ uninstall() {
     echo "Uninstall cancelled."
     return
   fi
-  
+
   log "Starting uninstallation..."
-  
+
   # Stop services
   systemctl stop nginx || log "${YELLOW}Failed to stop NGINX${NC}"
   systemctl stop "php$PHP_VERSION-fpm" || log "${YELLOW}Failed to stop PHP-FPM${NC}"
@@ -1113,20 +1273,20 @@ uninstall() {
   rm -f "/etc/fail2ban/jail.d/nginx-whitelist.conf" || log "${YELLOW}Failed to remove Fail2ban jail config${NC}"
   rm -f "/etc/fail2ban/filter.d/nginx-whitelist.conf" || log "${YELLOW}Failed to remove Fail2ban filter config${NC}"
   systemctl restart fail2ban || log "${YELLOW}Failed to restart Fail2ban after removing jails${NC}"
-  
+
   # Remove packages
   apt remove -y --purge nginx php-fpm php libnginx-mod-stream certbot python3-certbot-nginx fail2ban || log "${YELLOW}Failed to remove some packages${NC}"
-  
+
   # Remove configuration files
   rm -rf "$WEB_DIR/post.php" || log "${YELLOW}Failed to remove PHP script${NC}"
-  rm -f "$WHITE_LIST_FILE" "$USED_TOKENS_FILE" "$PASSWORD_FILE" "$TELEGRAM_USERS_FILE" "$TELEGRAM_BOT_TOKEN_FILE" || log "${YELLOW}Failed to remove data files${NC}" 
+  rm -f "$WHITE_LIST_FILE" "$USED_TOKENS_FILE" "$PASSWORD_FILE" "$TELEGRAM_USERS_FILE" "$TELEGRAM_BOT_TOKEN_FILE" || log "${YELLOW}Failed to remove data files${NC}"
   rm -f "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK" || log "${YELLOW}Failed to remove NGINX config${NC}"
   rm -f "$STREAM_CONF_FILE" || log "${YELLOW}Failed to remove stream config${NC}"
   rm -f "$CONFIG_FILE" || log "${YELLOW}Failed to remove config file${NC}"
-  
+
   # Clean up
   apt autoremove -y || log "${YELLOW}Failed to autoremove packages${NC}"
-  
+
   log "${GREEN}Uninstallation complete.${NC}"
 }
 
@@ -1135,9 +1295,9 @@ install_all() {
   check_root
   load_config # Load existing config to see if it's a fresh install
   create_backup
-  
+
   log "Starting complete installation of whitelist system..."
-  
+
   # The MTProto Proxy installation is handled separately via menu option 1
   # install_mtproto_proxy # This line remains commented out as per your request
   install_nginx_with_stream
@@ -1148,7 +1308,7 @@ install_all() {
   configure_fail2ban # New: Configure Fail2ban
   fix_permissions # This now also handles verification
   setup_ufw_rules
-  
+
   log "${GREEN}Whitelist system installation completed successfully!${NC}"
   show_status
 }
@@ -1156,7 +1316,7 @@ install_all() {
 #Random HTML
 random_template_site() {
     # Check for dependencies (wget, unzip, shuf are already checked at script start)
-    
+
     # Download and extract randomfakehtml if not present
     cd "$HOME" || error_exit "Failed to change to HOME directory"
 
@@ -1202,13 +1362,14 @@ show_menu() {
     echo -e "4) Fix permissions"
     echo -e "5) Change Whitelist Password"
     echo -e "6) Check system status"
-    echo -e "7) Uninstall everything (full wipe) "
+    echo -e "7) Uninstall everything (full wipe)"
     echo -e "8) Send whitelist link via Telegram"
     echo -e "9) Random FakeHtml"
-    echo -e "A) Clean Old Whitelisted IPs" 
+    echo -e "M) Manage Telegram Users" # New option
+    echo -e "A) Clean Old Whitelisted IPs"
     echo -e "0) Exit${NC}"
     echo -e "==========================================="
-    
+
     read -p "Choose an option: " choice
     case $choice in
       1)
@@ -1254,7 +1415,11 @@ show_menu() {
         check_root
         random_template_site
         ;;
-      A|a) 
+      M|m) # New option
+        check_root
+        manage_telegram_users_menu
+        ;;
+      A|a)
         check_root
         clean_old_whitelist_entries
         ;;
@@ -1266,7 +1431,7 @@ show_menu() {
         echo -e "${RED}Invalid option. Please try again.${NC}"
         ;;
     esac
-    
+
     read -p "Press Enter to continue..."
   done
 }
@@ -1295,7 +1460,7 @@ log "Updating package lists..."
 apt update || error_exit "Failed to update package lists."
 
 # Load any existing config
-load_config 
+load_config
 
 # Get PHP version
 get_php_version
