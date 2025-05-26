@@ -35,6 +35,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m' # Add this line
 NC='\033[0m' # No Color
 
 # Initialize variables
@@ -664,6 +665,9 @@ EOF
 
 # Setup NGINX site configuration (Includes robust PHP processing)
 # Setup NGINX site configuration (Includes robust PHP processing)
+# ... (previous code) ...
+
+# Setup NGINX site configuration (Includes robust PHP processing)
 setup_nginx_site() {
   log "Configuring NGINX site..."
 
@@ -683,7 +687,7 @@ setup_nginx_site() {
   while true; do
     read -p "Enter NGINX whitelist gateway port (e.g., 8443): " -i "8443" -e NGINX_PORT # Added default
     validate_port "$NGINX_PORT" && break
-  done # <--- This `done` closes the while loop for NGINX_PORT
+  done
 
   get_php_version
   if [[ -z "$PHP_VERSION" ]]; then
@@ -702,58 +706,52 @@ setup_nginx_site() {
       fi
   fi
 
-  # Create HTTP server block
+  # Create an initial HTTP server block (Certbot needs something to modify)
+  # This block will be overwritten later, but Certbot expects a server block for the domain.
   cat > "$WHITELIST_SITE_CONF" <<EOF
 server {
-  listen 80 $(if [[ "$use_proxy_protocol" == "y" ]]; then echo "proxy_protocol"; fi);
+  listen 80;
   server_name $DOMAIN;
-
   root $WEB_DIR;
   index index.php index.html;
-
-  $(if [[ "$use_proxy_protocol" == "y" ]]; then
-    echo "  set_real_ip_from $proxy_ip_range;"
-    echo "  real_ip_header proxy_protocol;"
-  fi)
-
-  location ~ \.php\$ {
-    # Ensure the PHP file exists before passing to FPM
-    try_files \$uri =404;
-
-    fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-    fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock; # Uses detected PHP version
-    fastcgi_index index.php;
-    fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-    include fastcgi_params; # This includes many standard FastCGI variables
-
-    # Pass real IP to PHP (NGINX updates \$remote_addr after proxy_protocol processing)
-    $(if [[ "$use_proxy_protocol" == "y" ]]; then
-      echo "    fastcgi_param REMOTE_ADDR \$remote_addr;"
-      echo "    fastcgi_param HTTP_X_REAL_IP \$remote_addr;"
-      echo "    fastcgi_param HTTP_X_FORWARDED_FOR \$remote_addr;"
-    fi)
-  }
-
   location / {
     try_files \$uri \$uri/ =404;
   }
 }
 EOF
 
-  # Create symlink
+  # Create symlink (should be done before Certbot runs)
   ln -sf "$WHITELIST_SITE_CONF" "$NGINX_SITES_LINK" || error_exit "Failed to create NGINX symlink"
 
   # Obtain SSL certificate
   log "Obtaining SSL certificate..."
-  if ! certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN; then
-    log "${YELLOW}Certbot failed, continuing with self-signed certificate${NC}"
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /etc/ssl/private/nginx-selfsigned.key \
-      -out /etc/ssl/certs/nginx-selfsigned.crt \
-      -subj "/CN=$DOMAIN" || error_exit "Failed to create self-signed certificate"
+  local cert_success=false
+  local ssl_cert_path="/etc/ssl/certs/nginx-selfsigned.crt" # Default to self-signed paths
+  local ssl_key_path="/etc/ssl/private/nginx-selfsigned.key"
+  local ssl_trusted_cert_path="" # Default to empty for self-signed
+
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@$DOMAIN; then
+    log "${GREEN}Certbot SSL certificate obtained successfully.${NC}"
+    cert_success=true
+    ssl_cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+    ssl_key_path="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+    ssl_trusted_cert_path="/etc/letsencrypt/live/$DOMAIN/chain.pem"
+  else
+    log "${YELLOW}Certbot failed to obtain certificate. Falling back to self-signed certificate.${NC}"
+    # Ensure self-signed certificate is generated only if Certbot failed
+    if openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout "$ssl_key_path" \
+      -out "$ssl_cert_path" \
+      -subj "/CN=$DOMAIN"; then
+      log "${GREEN}Self-signed certificate created successfully.${NC}"
+    else
+      error_exit "Failed to create self-signed certificate after Certbot failure."
+    fi
+    cert_success=false
   fi
 
-  # Create HTTPS server block
+
+  # Create the final NGINX server block (HTTPS and HTTP redirect)
   cat > "$WHITELIST_SITE_CONF" <<EOF
 server {
     listen 443 ssl http2 $(if [[ "$use_proxy_protocol" == "y" ]]; then echo "proxy_protocol"; fi);
@@ -768,9 +766,9 @@ server {
       echo "  real_ip_header proxy_protocol;"
     fi)
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/chain.pem;
+    ssl_certificate $ssl_cert_path;
+    ssl_certificate_key $ssl_key_path;
+    $(if [[ -n "$ssl_trusted_cert_path" ]]; then echo "    ssl_trusted_certificate $ssl_trusted_cert_path;"; fi) # Only include if chain exists
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
@@ -847,6 +845,7 @@ EOF
 
   log "${GREEN}NGINX site configured successfully${NC}"
 }
+# ... (rest of the script) ...
 
 # Fix permissions (also includes verification)
 fix_permissions() {
@@ -917,10 +916,12 @@ EOF
     log "Fail2ban configuration primarily targets NGINX access.log for whitelist attempts."
     log "If PHP-FPM errors are logged separately with IP, consider adding a specific PHP-FPM jail."
 
+    # Enable Fail2ban to start on boot
+    systemctl enable fail2ban || error_exit "Failed to enable Fail2ban"
+    # Restart Fail2ban to apply new configuration
     systemctl restart fail2ban || error_exit "Failed to restart Fail2ban"
-    log "${GREEN}Fail2ban configured and restarted.${NC}"
+    log "${GREEN}Fail2ban configured, enabled, and restarted.${NC}"
 }
-
 
 # Clean old whitelist entries
 clean_old_whitelist_entries() {
@@ -1191,27 +1192,27 @@ show_status() {
 
   # Check whitelist count
   if [[ -f "$WHITE_LIST_FILE" ]]; then
-    echo -e "Whitelisted IPs: ${BLUE}$(grep -c '^allow' "$WHITE_LIST_FILE")${NC}" # Count lines starting with 'allow'
+    echo -e "Whitelisted IPs: ${CYAN}$(grep -c '^allow' "$WHITE_LIST_FILE")${NC}" # Count lines starting with 'allow'
   else
     echo -e "Whitelist file: ${RED}MISSING${NC}"
   fi
 
   # Check domain
   if [[ -n "$DOMAIN" ]]; then
-    echo -e "Configured domain: ${BLUE}$DOMAIN${NC}"
+    echo -e "Configured domain: ${CYAN}$DOMAIN${NC}"
   else
     echo -e "Domain: ${YELLOW}NOT CONFIGURED${NC}"
   fi
 
   # Check ports
   if [[ -n "$PROXY_PORT" ]]; then
-    echo -e "Proxy port: ${BLUE}$PROXY_PORT${NC}"
+    echo -e "Proxy port: ${CYAN}$PROXY_PORT${NC}"
   else
     echo -e "Proxy port: ${YELLOW}NOT CONFIGURED${NC}"
   fi
 
   if [[ -n "$NGINX_PORT" ]]; then
-    echo -e "Whitelist port: ${BLUE}$NGINX_PORT${NC}"
+    echo -e "Whitelist port: ${CYAN}$NGINX_PORT${NC}"
   else
     echo -e "Whitelist port: ${YELLOW}NOT CONFIGURED${NC}"
   fi
@@ -1220,7 +1221,7 @@ show_status() {
   if command -v systemctl >/dev/null && systemctl list-timers | grep -q 'certbot.timer'; then
       echo -e "Certbot Auto-Renewal: ${GREEN}ENABLED${NC}"
       local next_renewal=$(systemctl list-timers certbot.timer | grep 'certbot.timer' | awk '{print $5, $6, $7}')
-      echo -e "  Next renewal: ${BLUE}$next_renewal${NC}"
+      echo -e "  Next renewal: ${CYAN}$next_renewal${NC}"
   else
       echo -e "Certbot Auto-Renewal: ${YELLOW}NOT FOUND/DISABLED${NC} (Manual renewal may be required)"
   fi
@@ -1230,9 +1231,10 @@ show_status() {
       echo -e "Fail2ban: ${GREEN}RUNNING${NC}"
       local jails_active=$(fail2ban-client status | grep "Jail list" | sed -E 's/.*Jail list:[ \t]*(.*)/\1/; s/, / /g')
       if [[ -n "$jails_active" ]]; then
-          echo -e "  Active Jails: ${BLUE}$jails_active${NC}"
+          echo -e "  Active Jails: ${CYAN}$jails_active${NC}"
       else
           echo -e "  Active Jails: ${YELLOW}None (Check configuration)${NC}"
+           
       fi
   else
       echo -e "Fail2ban: ${RED}STOPPED${NC}"
@@ -1240,7 +1242,7 @@ show_status() {
 
   # Check saved Telegram users
   if [[ -f "$TELEGRAM_USERS_FILE" ]] && [[ -s "$TELEGRAM_USERS_FILE" ]]; then
-      echo -e "Saved Telegram Users: ${BLUE}$(wc -l < "$TELEGRAM_USERS_FILE")${NC}"
+      echo -e "Saved Telegram Users: ${CYAN}$(wc -l < "$TELEGRAM_USERS_FILE")${NC}"
   else
       echo -e "Saved Telegram Users: ${YELLOW}None${NC}"
   fi
