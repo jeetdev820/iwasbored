@@ -1345,6 +1345,13 @@ random_template_site() {
 
         cp -a "${RandomHTML}/." /var/www/html/ || error_exit "Failed to copy template files"
         log "${GREEN}Template extracted successfully!${NC}"
+         # --- ADD THIS PART ---
+        echo -e "\n${CYAN}To automate daily random template updates every 6 hours, add the following to your crontab:${NC}"
+        echo -e "${YELLOW}sudo crontab -e${NC}"
+        echo -e "${YELLOW}Then add this line to the file that opens:${NC}"
+        echo -e "${YELLOW}0 */6 * * * /bin/bash $(readlink -f "$0") --random-template >> /var/log/mtproxy-whitelist.log 2>&1${NC}"
+        echo -e "${YELLOW}(This will update the template at 00:00, 06:00, 12:00, and 18:00 daily.)${NC}"
+        # --- END ADDITION ---
     else
         error_exit "Extraction error: Template directory not found or web directory missing."
     fi
